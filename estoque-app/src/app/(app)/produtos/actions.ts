@@ -46,3 +46,43 @@ export async function criarProduto(_: ActionState, formData: FormData): Promise<
   revalidatePath("/produtos");
   return { ok: true, message: "Produto cadastrado com sucesso." };
 }
+
+export async function atualizarProduto(formData: FormData) {
+  if (!hasSupabaseEnv()) return;
+
+  const id = String(formData.get("id") ?? "").trim();
+  const nome = String(formData.get("nome") ?? "").trim();
+  const precoTexto = String(formData.get("preco") ?? "").replace(",", ".").trim();
+  const estoqueTexto = String(formData.get("estoque_atual") ?? "").trim();
+
+  const preco = Number(precoTexto);
+  const estoque = Number(estoqueTexto);
+
+  if (!id || !nome) return;
+  if (!Number.isFinite(preco) || preco < 0) return;
+  if (!Number.isInteger(estoque) || estoque < 0) return;
+
+  const supabase = getSupabaseClient();
+  await supabase
+    .from("produtos")
+    .update({
+      nome,
+      preco,
+      estoque_atual: estoque,
+    })
+    .eq("id", id);
+
+  revalidatePath("/produtos");
+}
+
+export async function excluirProduto(formData: FormData) {
+  if (!hasSupabaseEnv()) return;
+
+  const id = String(formData.get("id") ?? "").trim();
+  if (!id) return;
+
+  const supabase = getSupabaseClient();
+  await supabase.from("produtos").delete().eq("id", id);
+
+  revalidatePath("/produtos");
+}

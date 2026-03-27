@@ -63,6 +63,21 @@ for insert
 to anon
 with check (true);
 
+drop policy if exists "Permitir atualizacao de produtos" on public.produtos;
+create policy "Permitir atualizacao de produtos"
+on public.produtos
+for update
+to anon
+using (true)
+with check (true);
+
+drop policy if exists "Permitir exclusao de produtos" on public.produtos;
+create policy "Permitir exclusao de produtos"
+on public.produtos
+for delete
+to anon
+using (true);
+
 create table if not exists public.pedidos (
   id uuid primary key default gen_random_uuid(),
   cliente_id uuid not null references public.clientes (id),
