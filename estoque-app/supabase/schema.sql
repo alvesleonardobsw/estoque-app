@@ -42,6 +42,7 @@ using (true);
 create table if not exists public.produtos (
   id uuid primary key default gen_random_uuid(),
   nome text not null,
+  sabor text not null default 'frango',
   preco numeric(10, 2) not null check (preco >= 0),
   ativo boolean not null default true,
   estoque_atual integer not null default 0 check (estoque_atual >= 0),
@@ -50,6 +51,26 @@ create table if not exists public.produtos (
 
 alter table public.produtos
   add column if not exists ativo boolean not null default true;
+
+alter table public.produtos
+  add column if not exists sabor text;
+
+update public.produtos
+set sabor = 'frango'
+where sabor is null;
+
+alter table public.produtos
+  alter column sabor set default 'frango';
+
+alter table public.produtos
+  alter column sabor set not null;
+
+alter table public.produtos
+  drop constraint if exists produtos_sabor_check;
+
+alter table public.produtos
+  add constraint produtos_sabor_check
+  check (sabor in ('frango', 'carne', 'palmito', 'calabresa', 'camarao'));
 
 alter table public.produtos enable row level security;
 

@@ -7,6 +7,7 @@ import { salvarProduto } from "./actions";
 type ProdutoEdicao = {
   id: string;
   nome: string;
+  sabor: "frango" | "carne" | "palmito" | "calabresa" | "camarao";
   preco: number;
   estoque_atual: number;
 };
@@ -32,7 +33,7 @@ export function ProdutoForm({
 
       <input type="hidden" name="id" value={produtoEdicao?.id ?? ""} />
 
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-4">
         <label className="flex flex-col gap-1 text-sm md:col-span-2">
           Nome do produto
           <input
@@ -42,6 +43,21 @@ export function ProdutoForm({
             className="rounded-lg border border-black/15 bg-white px-3 py-2 outline-none ring-primary/40 focus:ring"
             placeholder="Ex.: Garrafa 500ml"
           />
+        </label>
+
+        <label className="flex flex-col gap-1 text-sm">
+          Sabor
+          <select
+            name="sabor"
+            defaultValue={produtoEdicao?.sabor ?? "frango"}
+            className="rounded-lg border border-black/15 bg-white px-3 py-2 outline-none ring-primary/40 focus:ring"
+          >
+            <option value="frango">Frango</option>
+            <option value="carne">Carne</option>
+            <option value="palmito">Palmito</option>
+            <option value="calabresa">Calabresa</option>
+            <option value="camarao">Camarao</option>
+          </select>
         </label>
 
         <label className="flex flex-col gap-1 text-sm">

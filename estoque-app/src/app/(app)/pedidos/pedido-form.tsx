@@ -14,11 +14,20 @@ type ClienteOption = {
 type ProdutoOption = {
   id: string;
   nome: string;
+  sabor: "frango" | "carne" | "palmito" | "calabresa" | "camarao";
   preco: number;
   estoque_atual: number;
 };
 
+type Sabor = "frango" | "carne" | "palmito" | "calabresa" | "camarao";
+
 type ItemForm = {
+  sabor: Sabor | "";
+  produto_id: string;
+  quantidade: number;
+};
+
+type PedidoEdicaoItem = {
   produto_id: string;
   quantidade: number;
 };
@@ -26,13 +35,37 @@ type ItemForm = {
 type PedidoEdicao = {
   id: string;
   cliente_id: string;
-  itens: ItemForm[];
+  itens: PedidoEdicaoItem[];
 };
 
 const initialState = {
   ok: false,
   message: "",
 };
+
+function normalizarTexto(valor: string) {
+  return valor
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+}
+
+function inferirSaborDoNome(nomeProduto: string): Sabor | "" {
+  const nome = normalizarTexto(nomeProduto);
+  if (nome.includes("camarao")) return "camarao";
+  if (nome.includes("calabresa")) return "calabresa";
+  if (nome.includes("palmito")) return "palmito";
+  if (nome.includes("carne")) return "carne";
+  if (nome.includes("frango")) return "frango";
+  return "";
+}
+
+function obterSaborProduto(produto: ProdutoOption): Sabor {
+  const inferido = inferirSaborDoNome(produto.nome);
+  if (produto.sabor !== "frango") return produto.sabor;
+  if (inferido && inferido !== "frango") return inferido;
+  return produto.sabor;
+}
 
 export function PedidoForm({
   clientes,
@@ -47,8 +80,18 @@ export function PedidoForm({
 }) {
   const [state, formAction, isPending] = useActionState(salvarPedido, initialState);
   const emEdicao = Boolean(pedidoEdicao);
+  const itensIniciais: ItemForm[] =
+    pedidoEdicao?.itens.length
+      ? pedidoEdicao.itens.map((item) => {
+          const produto = produtos.find((produtoAtual) => produtoAtual.id === item.produto_id);
+          return {
+            ...item,
+            sabor: produto ? obterSaborProduto(produto) : "",
+          };
+        })
+      : [{ sabor: "", produto_id: "", quantidade: 1 }];
   const [itens, setItens] = useState<ItemForm[]>(
-    pedidoEdicao?.itens.length ? pedidoEdicao.itens : [{ produto_id: "", quantidade: 1 }],
+    itensIniciais,
   );
   const [clienteId, setClienteId] = useState(pedidoEdicao?.cliente_id ?? "");
 
@@ -73,7 +116,7 @@ export function PedidoForm({
   }
 
   function adicionarItem() {
-    setItens((atual) => [...atual, { produto_id: "", quantidade: 1 }]);
+    setItens((atual) => [...atual, { sabor: "", produto_id: "", quantidade: 1 }]);
   }
 
   function removerItem(index: number) {
@@ -108,22 +151,52 @@ export function PedidoForm({
 
         {itens.map((item, index) => {
           const produto = produtosPorId.get(item.produto_id);
+          const produtosFiltrados = produtos.filter(
+            (produtoItem) => obterSaborProduto(produtoItem) === item.sabor,
+          );
           return (
-            <div key={`${index}-${item.produto_id}`} className="grid gap-2 rounded-lg border border-black/10 p-3 md:grid-cols-[1fr_140px_120px]">
+            <div
+              key={`${index}-${item.produto_id}`}
+              className="grid gap-2 rounded-lg border border-black/10 p-3 md:grid-cols-[140px_1fr_120px_56px]"
+            >
               <label className="flex flex-col gap-1 text-sm">
-                Produto
+                Sabor
                 <select
-                  value={item.produto_id}
+                  value={item.sabor}
                   onChange={(event) =>
                     atualizarItem(index, {
                       ...item,
-                      produto_id: event.target.value,
+                      sabor: event.target.value as ItemForm["sabor"],
+                      produto_id: "",
                     })
                   }
                   className="rounded-lg border border-black/15 bg-white px-3 py-2 outline-none ring-primary/40 focus:ring"
                 >
                   <option value="">Selecione</option>
-                  {produtos.map((produtoItem) => (
+                  <option value="frango">Frango</option>
+                  <option value="carne">Carne</option>
+                  <option value="palmito">Palmito</option>
+                  <option value="calabresa">Calabresa</option>
+                  <option value="camarao">Camarao</option>
+                </select>
+              </label>
+
+              <label className="flex flex-col gap-1 text-sm">
+                Produto
+                <select
+                  value={item.produto_id}
+                  onChange={(event) => {
+                    const produtoSelecionado = produtosPorId.get(event.target.value);
+                    atualizarItem(index, {
+                      ...item,
+                      produto_id: event.target.value,
+                      sabor: produtoSelecionado ? obterSaborProduto(produtoSelecionado) : item.sabor,
+                    });
+                  }}
+                  className="rounded-lg border border-black/15 bg-white px-3 py-2 outline-none ring-primary/40 focus:ring"
+                >
+                  <option value="">{item.sabor ? "Selecione" : "Escolha o sabor primeiro"}</option>
+                  {produtosFiltrados.map((produtoItem) => (
                     <option key={produtoItem.id} value={produtoItem.id}>
                       {produtoItem.nome} (estoque: {produtoItem.estoque_atual})
                     </option>
@@ -163,7 +236,7 @@ export function PedidoForm({
               </div>
 
               {produto ? (
-                <p className="text-xs text-foreground/70 md:col-span-3">
+                <p className="text-xs text-foreground/70 md:col-span-4">
                   Preco unitario:{" "}
                   {new Intl.NumberFormat("pt-BR", {
                     style: "currency",

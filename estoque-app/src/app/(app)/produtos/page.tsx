@@ -7,6 +7,7 @@ import { EditIcon, TrashIcon } from "@/components/action-icons";
 type Produto = {
   id: string;
   nome: string;
+  sabor: "frango" | "carne" | "palmito" | "calabresa" | "camarao";
   preco: number;
   estoque_atual: number;
 };
@@ -19,7 +20,7 @@ async function listarProdutos() {
   const supabase = getSupabaseClient();
   const { data, error } = await supabase
     .from("produtos")
-    .select("id, nome, preco, estoque_atual")
+    .select("id, nome, sabor, preco, estoque_atual")
     .eq("ativo", true)
     .order("created_at", { ascending: false });
 
@@ -117,6 +118,7 @@ export default async function ProdutosPage({ searchParams }: PageProps) {
             <thead>
               <tr className="border-b border-black/10 text-foreground/70">
                 <th className="px-2 py-2 font-medium">Nome</th>
+                <th className="px-2 py-2 font-medium">Sabor</th>
                 <th className="px-2 py-2 font-medium">Preco</th>
                 <th className="px-2 py-2 font-medium">Estoque atual</th>
                 <th className="px-2 py-2 font-medium">Acoes</th>
@@ -131,6 +133,7 @@ export default async function ProdutosPage({ searchParams }: PageProps) {
                   }`}
                 >
                   <td className="px-2 py-2">{produto.nome}</td>
+                  <td className="px-2 py-2 capitalize">{produto.sabor}</td>
                   <td className="px-2 py-2">{formatarPreco(produto.preco)}</td>
                   <td className="px-2 py-2">{produto.estoque_atual}</td>
                   <td className="px-2 py-2">

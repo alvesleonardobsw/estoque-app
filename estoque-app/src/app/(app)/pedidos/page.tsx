@@ -13,6 +13,7 @@ type Cliente = {
 type Produto = {
   id: string;
   nome: string;
+  sabor: "frango" | "carne" | "palmito" | "calabresa" | "camarao";
   preco: number;
   estoque_atual: number;
 };
@@ -67,7 +68,7 @@ async function carregarDadosPedidos(statusFiltro: "todos" | "pendente" | "entreg
     supabase.from("clientes").select("id, nome").order("nome", { ascending: true }),
     supabase
       .from("produtos")
-      .select("id, nome, preco, estoque_atual")
+      .select("id, nome, sabor, preco, estoque_atual")
       .eq("ativo", true)
       .order("nome", { ascending: true }),
     pedidosQuery,

@@ -9,6 +9,8 @@ type ActionState = {
   message: string;
 };
 
+const SABORES_VALIDOS = ["frango", "carne", "palmito", "calabresa", "camarao"] as const;
+
 export async function salvarProduto(_: ActionState, formData: FormData): Promise<ActionState> {
   if (!hasSupabaseEnv()) {
     return { ok: false, message: "Configure o Supabase antes de cadastrar produtos." };
@@ -16,6 +18,7 @@ export async function salvarProduto(_: ActionState, formData: FormData): Promise
 
   const id = String(formData.get("id") ?? "").trim();
   const nome = String(formData.get("nome") ?? "").trim();
+  const sabor = String(formData.get("sabor") ?? "").trim();
   const precoTexto = String(formData.get("preco") ?? "").replace(",", ".").trim();
   const estoqueTexto = String(formData.get("estoque_atual") ?? "").trim();
 
@@ -24,6 +27,10 @@ export async function salvarProduto(_: ActionState, formData: FormData): Promise
 
   if (!nome) {
     return { ok: false, message: "O nome do produto e obrigatorio." };
+  }
+
+  if (!SABORES_VALIDOS.includes(sabor as (typeof SABORES_VALIDOS)[number])) {
+    return { ok: false, message: "Selecione um sabor valido." };
   }
 
   if (!Number.isFinite(preco) || preco < 0) {
@@ -40,12 +47,14 @@ export async function salvarProduto(_: ActionState, formData: FormData): Promise
         .from("produtos")
         .update({
           nome,
+          sabor,
           preco,
           estoque_atual: estoque,
         })
         .eq("id", id)
     : await supabase.from("produtos").insert({
         nome,
+        sabor,
         preco,
         estoque_atual: estoque,
       });
