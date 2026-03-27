@@ -36,3 +36,38 @@ export async function criarCliente(_: ActionState, formData: FormData): Promise<
   revalidatePath("/clientes");
   return { ok: true, message: "Cliente cadastrado com sucesso." };
 }
+
+export async function atualizarCliente(formData: FormData) {
+  if (!hasSupabaseEnv()) return;
+
+  const id = String(formData.get("id") ?? "").trim();
+  const nome = String(formData.get("nome") ?? "").trim();
+  const telefone = String(formData.get("telefone") ?? "").trim();
+  const endereco = String(formData.get("endereco") ?? "").trim();
+
+  if (!id || !nome) return;
+
+  const supabase = getSupabaseClient();
+  await supabase
+    .from("clientes")
+    .update({
+      nome,
+      telefone,
+      endereco,
+    })
+    .eq("id", id);
+
+  revalidatePath("/clientes");
+}
+
+export async function excluirCliente(formData: FormData) {
+  if (!hasSupabaseEnv()) return;
+
+  const id = String(formData.get("id") ?? "").trim();
+  if (!id) return;
+
+  const supabase = getSupabaseClient();
+  await supabase.from("clientes").delete().eq("id", id);
+
+  revalidatePath("/clientes");
+}
