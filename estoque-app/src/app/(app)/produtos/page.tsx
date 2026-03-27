@@ -20,6 +20,7 @@ async function listarProdutos() {
   const { data, error } = await supabase
     .from("produtos")
     .select("id, nome, preco, estoque_atual")
+    .eq("ativo", true)
     .order("created_at", { ascending: false });
 
   if (error) {
@@ -37,13 +38,15 @@ function formatarPreco(valor: number) {
 }
 
 type PageProps = {
-  searchParams: Promise<{ editar?: string; novo?: string }>;
+  searchParams: Promise<{ editar?: string; novo?: string; erro?: string; sucesso?: string }>;
 };
 
 export default async function ProdutosPage({ searchParams }: PageProps) {
   const params = await searchParams;
   const editarId = typeof params.editar === "string" ? params.editar : "";
   const novo = typeof params.novo === "string" ? params.novo : "";
+  const erroAcao = typeof params.erro === "string" ? params.erro : "";
+  const sucessoAcao = typeof params.sucesso === "string" ? params.sucesso : "";
   const { produtos, erro } = await listarProdutos();
   const produtoEdicao = produtos.find((produto) => produto.id === editarId) ?? null;
   const mostrarFormulario = Boolean(produtoEdicao) || novo === "1";
@@ -85,6 +88,24 @@ export default async function ProdutosPage({ searchParams }: PageProps) {
         <article className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
           Nao foi possivel carregar produtos ainda: {erro}. Execute o SQL de
           `supabase/schema.sql` no Supabase e recarregue a pagina.
+        </article>
+      ) : null}
+
+      {sucessoAcao === "excluido" ? (
+        <article className="rounded-xl border border-green-300 bg-green-50 p-4 text-sm text-green-800">
+          Produto excluido com sucesso.
+        </article>
+      ) : null}
+
+      {sucessoAcao === "inativado" ? (
+        <article className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
+          Produto retirado da listagem porque ja possui historico de pedidos.
+        </article>
+      ) : null}
+
+      {erroAcao === "exclusao" ? (
+        <article className="rounded-xl border border-red-300 bg-red-50 p-4 text-sm text-red-800">
+          Nao foi possivel excluir o produto. Tente novamente.
         </article>
       ) : null}
 

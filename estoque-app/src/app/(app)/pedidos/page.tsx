@@ -68,6 +68,7 @@ async function carregarDadosPedidos(statusFiltro: "todos" | "pendente" | "entreg
     supabase
       .from("produtos")
       .select("id, nome, preco, estoque_atual")
+      .eq("ativo", true)
       .order("nome", { ascending: true }),
     pedidosQuery,
   ]);

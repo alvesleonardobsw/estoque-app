@@ -75,8 +75,12 @@ async function carregarDashboard() {
   const [clientesResp, produtosCountResp, produtosResp, pedidosHojeResp, pedidosMesResp, pedidosResp, pedidosPendentesResp] =
     await Promise.all([
       supabase.from("clientes").select("id", { count: "exact", head: true }),
-      supabase.from("produtos").select("id", { count: "exact", head: true }),
-      supabase.from("produtos").select("id, nome, estoque_atual").order("estoque_atual", { ascending: true }),
+      supabase.from("produtos").select("id", { count: "exact", head: true }).eq("ativo", true),
+      supabase
+        .from("produtos")
+        .select("id, nome, estoque_atual")
+        .eq("ativo", true)
+        .order("estoque_atual", { ascending: true }),
       supabase
         .from("pedidos")
         .select("id, total, created_at")

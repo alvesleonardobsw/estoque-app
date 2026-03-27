@@ -43,9 +43,13 @@ create table if not exists public.produtos (
   id uuid primary key default gen_random_uuid(),
   nome text not null,
   preco numeric(10, 2) not null check (preco >= 0),
+  ativo boolean not null default true,
   estoque_atual integer not null default 0 check (estoque_atual >= 0),
   created_at timestamptz not null default now()
 );
+
+alter table public.produtos
+  add column if not exists ativo boolean not null default true;
 
 alter table public.produtos enable row level security;
 

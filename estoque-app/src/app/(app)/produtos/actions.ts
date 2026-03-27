@@ -63,13 +63,38 @@ export async function salvarProduto(_: ActionState, formData: FormData): Promise
 }
 
 export async function excluirProduto(formData: FormData) {
-  if (!hasSupabaseEnv()) return;
+  if (!hasSupabaseEnv()) {
+    redirect("/produtos?erro=config");
+  }
 
   const id = String(formData.get("id") ?? "").trim();
-  if (!id) return;
+  if (!id) {
+    redirect("/produtos?erro=exclusao");
+  }
 
   const supabase = getSupabaseClient();
-  await supabase.from("produtos").delete().eq("id", id);
+  const { error } = await supabase.from("produtos").delete().eq("id", id);
+
+  if (error) {
+    if (error.code === "23503") {
+      const { error: inativarErro } = await supabase
+        .from("produtos")
+        .update({ ativo: false })
+        .eq("id", id);
+
+      if (!inativarErro) {
+        revalidatePath("/produtos");
+        revalidatePath("/pedidos");
+        revalidatePath("/");
+        redirect("/produtos?sucesso=inativado");
+      }
+    }
+
+    redirect("/produtos?erro=exclusao");
+  }
 
   revalidatePath("/produtos");
+  revalidatePath("/pedidos");
+  revalidatePath("/");
+  redirect("/produtos?sucesso=excluido");
 }
