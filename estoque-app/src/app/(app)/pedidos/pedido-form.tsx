@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { useActionState } from "react";
 import Link from "next/link";
 import { salvarPedido } from "./actions";
+import { TrashIcon } from "@/components/action-icons";
 
 type ClienteOption = {
   id: string;
@@ -37,10 +38,12 @@ export function PedidoForm({
   clientes,
   produtos,
   pedidoEdicao,
+  mostrarCancelarNovo,
 }: {
   clientes: ClienteOption[];
   produtos: ProdutoOption[];
   pedidoEdicao: PedidoEdicao | null;
+  mostrarCancelarNovo: boolean;
 }) {
   const [state, formAction, isPending] = useActionState(salvarPedido, initialState);
   const emEdicao = Boolean(pedidoEdicao);
@@ -149,9 +152,13 @@ export function PedidoForm({
                 <button
                   type="button"
                   onClick={() => removerItem(index)}
-                  className="w-full rounded-lg border border-black/20 px-3 py-2 text-sm"
+                  className="w-full rounded-lg border border-black/20 p-2 text-sm"
+                  aria-label="Remover item"
+                  title="Remover item"
                 >
-                  Remover
+                  <span className="flex items-center justify-center">
+                    <TrashIcon />
+                  </span>
                 </button>
               </div>
 
@@ -207,7 +214,7 @@ export function PedidoForm({
         {isPending ? "Salvando..." : emEdicao ? "Salvar" : "Criar pedido"}
       </button>
 
-      {emEdicao ? (
+      {emEdicao || mostrarCancelarNovo ? (
         <Link
           href="/pedidos"
           className="ml-2 inline-block rounded-lg border border-black/20 px-4 py-2 text-sm font-medium"

@@ -3,6 +3,7 @@ import { getSupabaseClient, hasSupabaseEnv } from "@/lib/supabase";
 import { excluirCliente } from "./actions";
 import { ConfirmDeleteButton } from "./confirm-delete-button";
 import Link from "next/link";
+import { EditIcon } from "@/components/action-icons";
 
 type Cliente = {
   id: string;
@@ -93,9 +94,11 @@ export default async function ClientesPage({ searchParams }: PageProps) {
                     <div className="flex gap-2">
                       <Link
                         href={`/clientes?editar=${cliente.id}`}
-                        className="rounded-md border border-black/20 px-2 py-1 text-xs"
+                        className="rounded-md border border-black/20 p-2 text-xs"
+                        aria-label="Editar cliente"
+                        title="Editar cliente"
                       >
-                        Editar
+                        <EditIcon />
                       </Link>
 
                       <form id={`excluir-cliente-${cliente.id}`} action={excluirCliente}>

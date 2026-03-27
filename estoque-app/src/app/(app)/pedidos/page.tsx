@@ -3,6 +3,7 @@ import { PedidoForm } from "./pedido-form";
 import { excluirPedido } from "./actions";
 import Link from "next/link";
 import { ConfirmDeletePedidoButton } from "./confirm-delete-button";
+import { EditIcon } from "@/components/action-icons";
 
 type Cliente = {
   id: string;
@@ -98,20 +99,32 @@ function extrairNomeRelacao(
 }
 
 type PageProps = {
-  searchParams: Promise<{ editar?: string }>;
+  searchParams: Promise<{ editar?: string; novo?: string }>;
 };
 
 export default async function PedidosPage({ searchParams }: PageProps) {
   const params = await searchParams;
   const editarId = typeof params.editar === "string" ? params.editar : "";
+  const novo = typeof params.novo === "string" ? params.novo : "";
   const { clientes, produtos, pedidos, erro } = await carregarDadosPedidos();
   const pedidoEdicao = pedidos.find((pedido) => pedido.id === editarId);
+  const mostrarFormulario = Boolean(pedidoEdicao) || novo === "1";
 
   return (
     <section className="space-y-6">
-      <header>
-        <p className="text-sm text-foreground/70">Operacao</p>
-        <h1 className="text-2xl font-semibold">Pedidos</h1>
+      <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="text-sm text-foreground/70">Operacao</p>
+          <h1 className="text-2xl font-semibold">Pedidos</h1>
+        </div>
+        {!mostrarFormulario ? (
+          <Link
+            href="/pedidos?novo=1"
+            className="inline-block rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-contrast"
+          >
+            Criar pedido
+          </Link>
+        ) : null}
       </header>
 
       {!hasSupabaseEnv() ? (
@@ -129,23 +142,26 @@ export default async function PedidosPage({ searchParams }: PageProps) {
         </article>
       ) : null}
 
-      <PedidoForm
-        key={pedidoEdicao?.id ?? "novo"}
-        clientes={clientes}
-        produtos={produtos}
-        pedidoEdicao={
-          pedidoEdicao
-            ? {
-                id: pedidoEdicao.id,
-                cliente_id: pedidoEdicao.cliente_id,
-                itens: pedidoEdicao.pedido_itens.map((item) => ({
-                  produto_id: item.produto_id,
-                  quantidade: item.quantidade,
-                })),
-              }
-            : null
-        }
-      />
+      {mostrarFormulario ? (
+        <PedidoForm
+          key={pedidoEdicao?.id ?? "novo"}
+          clientes={clientes}
+          produtos={produtos}
+          pedidoEdicao={
+            pedidoEdicao
+              ? {
+                  id: pedidoEdicao.id,
+                  cliente_id: pedidoEdicao.cliente_id,
+                  itens: pedidoEdicao.pedido_itens.map((item) => ({
+                    produto_id: item.produto_id,
+                    quantidade: item.quantidade,
+                  })),
+                }
+              : null
+          }
+          mostrarCancelarNovo={!pedidoEdicao}
+        />
+      ) : null}
 
       <article className="rounded-xl border border-black/10 bg-surface p-4">
         <h2 className="text-lg font-medium">Ultimos pedidos</h2>
@@ -177,9 +193,11 @@ export default async function PedidosPage({ searchParams }: PageProps) {
                 <div className="mt-3 flex gap-2">
                   <Link
                     href={`/pedidos?editar=${pedido.id}`}
-                    className="rounded-md border border-black/20 px-2 py-1 text-xs"
+                    className="rounded-md border border-black/20 p-2 text-xs"
+                    aria-label="Editar pedido"
+                    title="Editar pedido"
                   >
-                    Editar
+                    <EditIcon />
                   </Link>
                   <form id={`excluir-pedido-${pedido.id}`} action={excluirPedido}>
                     <input type="hidden" name="pedido_id" value={pedido.id} />

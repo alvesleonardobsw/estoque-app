@@ -186,9 +186,22 @@ export default async function DashboardPage() {
           ) : (
             <ul className="mt-3 space-y-2 text-sm">
               {dados.produtosBaixoEstoque.map((produto) => (
-                <li key={produto.id} className="flex items-center justify-between rounded-lg border border-black/10 p-3">
+                <li
+                  key={produto.id}
+                  className={`flex items-center justify-between rounded-lg border p-3 ${
+                    produto.estoque_atual === 0
+                      ? "border-red-200 bg-red-50"
+                      : "border-black/10"
+                  }`}
+                >
                   <span>{produto.nome}</span>
-                  <span className="font-semibold text-primary">{produto.estoque_atual} un.</span>
+                  <span
+                    className={`font-semibold ${
+                      produto.estoque_atual === 0 ? "text-red-700" : "text-primary"
+                    }`}
+                  >
+                    {produto.estoque_atual} un.
+                  </span>
                 </li>
               ))}
             </ul>

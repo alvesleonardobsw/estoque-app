@@ -1,5 +1,7 @@
 "use client";
 
+import { TrashIcon } from "@/components/action-icons";
+
 type Props = {
   formId: string;
 };
@@ -15,9 +17,11 @@ export function ConfirmDeletePedidoButton({ formId }: Props) {
           event.preventDefault();
         }
       }}
-      className="rounded-md border border-red-300 bg-red-50 px-2 py-1 text-xs text-red-700"
+      className="rounded-md border border-red-300 bg-red-50 p-2 text-xs text-red-700"
+      aria-label="Excluir pedido"
+      title="Excluir pedido"
     >
-      Excluir pedido
+      <TrashIcon />
     </button>
   );
 }

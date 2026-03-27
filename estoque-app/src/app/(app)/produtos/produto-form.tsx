@@ -16,7 +16,13 @@ const initialState = {
   message: "",
 };
 
-export function ProdutoForm({ produtoEdicao }: { produtoEdicao: ProdutoEdicao | null }) {
+export function ProdutoForm({
+  produtoEdicao,
+  mostrarCancelarNovo,
+}: {
+  produtoEdicao: ProdutoEdicao | null;
+  mostrarCancelarNovo: boolean;
+}) {
   const [state, formAction, isPending] = useActionState(salvarProduto, initialState);
   const emEdicao = Boolean(produtoEdicao);
 
@@ -86,7 +92,7 @@ export function ProdutoForm({ produtoEdicao }: { produtoEdicao: ProdutoEdicao | 
           {isPending ? "Salvando..." : emEdicao ? "Salvar" : "Cadastrar produto"}
         </button>
 
-        {emEdicao ? (
+        {emEdicao || mostrarCancelarNovo ? (
           <Link
             href="/produtos"
             className="rounded-lg border border-black/20 px-4 py-2 text-sm font-medium"
