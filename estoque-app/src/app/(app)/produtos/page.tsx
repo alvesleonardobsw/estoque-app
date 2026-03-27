@@ -39,8 +39,50 @@ function formatarPreco(valor: number) {
 }
 
 type PageProps = {
-  searchParams: Promise<{ editar?: string; novo?: string; erro?: string; sucesso?: string }>;
+  searchParams: Promise<{
+    editar?: string;
+    novo?: string;
+    erro?: string;
+    sucesso?: string;
+    sabor?: string;
+    peso?: string;
+  }>;
 };
+
+type Sabor = "frango" | "carne" | "palmito" | "calabresa" | "camarao";
+
+function normalizarPeso(valor: string) {
+  return valor.toLowerCase().replace(/\s+/g, "");
+}
+
+function normalizarTexto(valor: string) {
+  return valor
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+}
+
+function inferirSaborDoNome(nomeProduto: string): Sabor | "" {
+  const nome = normalizarTexto(nomeProduto);
+  if (nome.includes("camarao")) return "camarao";
+  if (nome.includes("calabresa")) return "calabresa";
+  if (nome.includes("palmito")) return "palmito";
+  if (nome.includes("carne")) return "carne";
+  if (nome.includes("frango")) return "frango";
+  return "";
+}
+
+function obterSaborEfetivo(produto: Produto): Sabor {
+  const inferido = inferirSaborDoNome(produto.nome);
+  if (produto.sabor !== "frango") return produto.sabor;
+  if (inferido && inferido !== "frango") return inferido;
+  return produto.sabor;
+}
+
+function extrairPesoDoNome(nome: string) {
+  const match = nome.toLowerCase().match(/(\d+\s?(?:g|kg))/);
+  return match ? normalizarPeso(match[1]) : "";
+}
 
 export default async function ProdutosPage({ searchParams }: PageProps) {
   const params = await searchParams;
@@ -48,9 +90,23 @@ export default async function ProdutosPage({ searchParams }: PageProps) {
   const novo = typeof params.novo === "string" ? params.novo : "";
   const erroAcao = typeof params.erro === "string" ? params.erro : "";
   const sucessoAcao = typeof params.sucesso === "string" ? params.sucesso : "";
+  const saborFiltro =
+    params.sabor === "frango" ||
+    params.sabor === "carne" ||
+    params.sabor === "palmito" ||
+    params.sabor === "calabresa" ||
+    params.sabor === "camarao"
+      ? (params.sabor as Sabor)
+      : "";
+  const pesoFiltro = typeof params.peso === "string" ? normalizarPeso(params.peso) : "";
   const { produtos, erro } = await listarProdutos();
   const produtoEdicao = produtos.find((produto) => produto.id === editarId) ?? null;
   const mostrarFormulario = Boolean(produtoEdicao) || novo === "1";
+  const produtosFiltrados = produtos.filter((produto) => {
+    const matchSabor = !saborFiltro || obterSaborEfetivo(produto) === saborFiltro;
+    const matchPeso = !pesoFiltro || extrairPesoDoNome(produto.nome) === pesoFiltro;
+    return matchSabor && matchPeso;
+  });
 
   return (
     <section className="space-y-6">
@@ -113,6 +169,52 @@ export default async function ProdutosPage({ searchParams }: PageProps) {
       <article className="rounded-xl border border-black/10 bg-surface p-4">
         <h2 className="text-lg font-medium">Produtos cadastrados</h2>
 
+        <form method="get" className="mt-3 grid gap-2 rounded-lg border border-black/10 p-3 md:grid-cols-[1fr_1fr_auto_auto]">
+          <label className="flex flex-col gap-1 text-sm">
+            Filtrar por sabor
+            <select
+              name="sabor"
+              defaultValue={saborFiltro}
+              className="rounded-md border border-black/15 bg-white px-2 py-2"
+            >
+              <option value="">Todos</option>
+              <option value="frango">Frango</option>
+              <option value="carne">Carne</option>
+              <option value="palmito">Palmito</option>
+              <option value="calabresa">Calabresa</option>
+              <option value="camarao">Camarao</option>
+            </select>
+          </label>
+
+          <label className="flex flex-col gap-1 text-sm">
+            Filtrar por peso
+            <select
+              name="peso"
+              defaultValue={pesoFiltro}
+              className="rounded-md border border-black/15 bg-white px-2 py-2"
+            >
+              <option value="">Todos</option>
+              <option value="350g">350g</option>
+              <option value="500g">500g</option>
+              <option value="1kg">1kg</option>
+            </select>
+          </label>
+
+          <button
+            type="submit"
+            className="self-end rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-contrast"
+          >
+            Aplicar
+          </button>
+
+          <Link
+            href="/produtos"
+            className="self-end rounded-md border border-black/20 px-3 py-2 text-center text-sm"
+          >
+            Limpar
+          </Link>
+        </form>
+
         <div className="mt-3 overflow-x-auto">
           <table className="min-w-full text-left text-sm">
             <thead>
@@ -125,7 +227,7 @@ export default async function ProdutosPage({ searchParams }: PageProps) {
               </tr>
             </thead>
             <tbody>
-              {produtos.map((produto) => (
+              {produtosFiltrados.map((produto) => (
                 <tr
                   key={produto.id}
                   className={`border-b border-black/5 ${
@@ -133,7 +235,7 @@ export default async function ProdutosPage({ searchParams }: PageProps) {
                   }`}
                 >
                   <td className="px-2 py-2">{produto.nome}</td>
-                  <td className="px-2 py-2 capitalize">{produto.sabor}</td>
+                  <td className="px-2 py-2 capitalize">{obterSaborEfetivo(produto)}</td>
                   <td className="px-2 py-2">{formatarPreco(produto.preco)}</td>
                   <td className="px-2 py-2">{produto.estoque_atual}</td>
                   <td className="px-2 py-2">
@@ -168,6 +270,10 @@ export default async function ProdutosPage({ searchParams }: PageProps) {
 
         {produtos.length === 0 ? (
           <p className="mt-3 text-sm text-foreground/70">Nenhum produto cadastrado ainda.</p>
+        ) : produtosFiltrados.length === 0 ? (
+          <p className="mt-3 text-sm text-foreground/70">
+            Nenhum produto encontrado para o filtro selecionado.
+          </p>
         ) : null}
       </article>
     </section>
