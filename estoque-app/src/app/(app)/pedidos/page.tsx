@@ -3,7 +3,7 @@ import { PedidoForm } from "./pedido-form";
 import { atualizarStatusPedido, excluirPedido } from "./actions";
 import Link from "next/link";
 import { ConfirmDeletePedidoButton } from "./confirm-delete-button";
-import { EditIcon } from "@/components/action-icons";
+import { CheckCircleIcon, EditIcon, PrintIcon, UndoIcon } from "@/components/action-icons";
 
 type Cliente = {
   id: string;
@@ -244,33 +244,51 @@ export default async function PedidosPage({ searchParams }: PageProps) {
                   ))}
                 </ul>
 
-                <div className="mt-3 flex gap-2">
-                  <form action={atualizarStatusPedido}>
-                    <input type="hidden" name="pedido_id" value={pedido.id} />
-                    <input
-                      type="hidden"
-                      name="status"
-                      value={pedido.status === "entregue" ? "pendente" : "entregue"}
-                    />
+                <div className="mt-3 flex items-center justify-between">
+                  <div className="flex gap-2">
+                    <form action={atualizarStatusPedido}>
+                      <input type="hidden" name="pedido_id" value={pedido.id} />
+                      <input
+                        type="hidden"
+                        name="status"
+                        value={pedido.status === "entregue" ? "pendente" : "entregue"}
+                      />
                     <button
                       type="submit"
-                      className="rounded-md border border-black/20 px-2 py-1 text-xs"
+                      className="rounded-md border border-black/20 p-2 text-xs"
+                      aria-label={
+                        pedido.status === "entregue" ? "Marcar pedido como pendente" : "Marcar pedido como entregue"
+                      }
+                      title={
+                        pedido.status === "entregue" ? "Marcar como pendente" : "Marcar como entregue"
+                      }
                     >
-                      {pedido.status === "entregue" ? "Marcar pendente" : "Marcar entregue"}
+                      {pedido.status === "entregue" ? <UndoIcon /> : <CheckCircleIcon />}
                     </button>
                   </form>
+                    <Link
+                      href={`/pedidos?editar=${pedido.id}`}
+                      className="rounded-md border border-black/20 p-2 text-xs"
+                      aria-label="Editar pedido"
+                      title="Editar pedido"
+                    >
+                      <EditIcon />
+                    </Link>
+                    <form id={`excluir-pedido-${pedido.id}`} action={excluirPedido}>
+                      <input type="hidden" name="pedido_id" value={pedido.id} />
+                    </form>
+                    <ConfirmDeletePedidoButton formId={`excluir-pedido-${pedido.id}`} />
+                  </div>
+
                   <Link
-                    href={`/pedidos?editar=${pedido.id}`}
+                    href={`/imprimir/pedidos/${pedido.id}`}
+                    target="_blank"
                     className="rounded-md border border-black/20 p-2 text-xs"
-                    aria-label="Editar pedido"
-                    title="Editar pedido"
+                    aria-label="Imprimir pedido"
+                    title="Imprimir pedido"
                   >
-                    <EditIcon />
+                    <PrintIcon />
                   </Link>
-                  <form id={`excluir-pedido-${pedido.id}`} action={excluirPedido}>
-                    <input type="hidden" name="pedido_id" value={pedido.id} />
-                  </form>
-                  <ConfirmDeletePedidoButton formId={`excluir-pedido-${pedido.id}`} />
                 </div>
               </div>
             ))}
