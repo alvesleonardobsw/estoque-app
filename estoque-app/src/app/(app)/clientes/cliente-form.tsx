@@ -1,19 +1,30 @@
 "use client";
 
 import { useActionState } from "react";
-import { criarCliente } from "./actions";
+import Link from "next/link";
+import { salvarCliente } from "./actions";
+
+type ClienteEdicao = {
+  id: string;
+  nome: string;
+  telefone: string | null;
+  endereco: string | null;
+};
 
 const initialState = {
   ok: false,
   message: "",
 };
 
-export function ClienteForm() {
-  const [state, formAction, isPending] = useActionState(criarCliente, initialState);
+export function ClienteForm({ clienteEdicao }: { clienteEdicao: ClienteEdicao | null }) {
+  const [state, formAction, isPending] = useActionState(salvarCliente, initialState);
+  const emEdicao = Boolean(clienteEdicao);
 
   return (
     <form action={formAction} className="space-y-4 rounded-xl border border-black/10 bg-surface p-4">
-      <h2 className="text-lg font-medium">Novo cliente</h2>
+      <h2 className="text-lg font-medium">{emEdicao ? "Editar cliente" : "Novo cliente"}</h2>
+
+      <input type="hidden" name="id" value={clienteEdicao?.id ?? ""} />
 
       <div className="grid gap-4 md:grid-cols-2">
         <label className="flex flex-col gap-1 text-sm">
@@ -21,6 +32,7 @@ export function ClienteForm() {
           <input
             name="nome"
             required
+            defaultValue={clienteEdicao?.nome ?? ""}
             className="rounded-lg border border-black/15 bg-white px-3 py-2 outline-none ring-primary/40 focus:ring"
             placeholder="Ex.: Maria Silva"
           />
@@ -30,6 +42,7 @@ export function ClienteForm() {
           Telefone
           <input
             name="telefone"
+            defaultValue={clienteEdicao?.telefone ?? ""}
             className="rounded-lg border border-black/15 bg-white px-3 py-2 outline-none ring-primary/40 focus:ring"
             placeholder="(11) 99999-9999"
           />
@@ -40,6 +53,7 @@ export function ClienteForm() {
         Endereco
         <input
           name="endereco"
+          defaultValue={clienteEdicao?.endereco ?? ""}
           className="rounded-lg border border-black/15 bg-white px-3 py-2 outline-none ring-primary/40 focus:ring"
           placeholder="Rua, numero, bairro"
         />
@@ -55,13 +69,24 @@ export function ClienteForm() {
         </p>
       ) : null}
 
-      <button
-        type="submit"
-        disabled={isPending}
-        className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-contrast disabled:cursor-not-allowed disabled:opacity-70"
-      >
-        {isPending ? "Salvando..." : "Cadastrar cliente"}
-      </button>
+      <div className="flex gap-2">
+        <button
+          type="submit"
+          disabled={isPending}
+          className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-contrast disabled:cursor-not-allowed disabled:opacity-70"
+        >
+          {isPending ? "Salvando..." : emEdicao ? "Salvar" : "Cadastrar cliente"}
+        </button>
+
+        {emEdicao ? (
+          <Link
+            href="/clientes"
+            className="rounded-lg border border-black/20 px-4 py-2 text-sm font-medium"
+          >
+            Cancelar
+          </Link>
+        ) : null}
+      </div>
     </form>
   );
 }

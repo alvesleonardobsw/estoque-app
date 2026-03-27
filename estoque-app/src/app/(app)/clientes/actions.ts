@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { getSupabaseClient, hasSupabaseEnv } from "@/lib/supabase";
 
 type ActionState = {
@@ -8,11 +9,12 @@ type ActionState = {
   message: string;
 };
 
-export async function criarCliente(_: ActionState, formData: FormData): Promise<ActionState> {
+export async function salvarCliente(_: ActionState, formData: FormData): Promise<ActionState> {
   if (!hasSupabaseEnv()) {
     return { ok: false, message: "Configure o Supabase antes de cadastrar clientes." };
   }
 
+  const id = String(formData.get("id") ?? "").trim();
   const nome = String(formData.get("nome") ?? "").trim();
   const telefone = String(formData.get("telefone") ?? "").trim();
   const endereco = String(formData.get("endereco") ?? "").trim();
@@ -23,51 +25,57 @@ export async function criarCliente(_: ActionState, formData: FormData): Promise<
 
   const supabase = getSupabaseClient();
 
-  const { error } = await supabase.from("clientes").insert({
-    nome,
-    telefone,
-    endereco,
-  });
+  const { error } = id
+    ? await supabase
+        .from("clientes")
+        .update({
+          nome,
+          telefone,
+          endereco,
+        })
+        .eq("id", id)
+    : await supabase.from("clientes").insert({
+        nome,
+        telefone,
+        endereco,
+      });
 
   if (error) {
     return { ok: false, message: `Erro ao salvar cliente: ${error.message}` };
   }
 
   revalidatePath("/clientes");
-  return { ok: true, message: "Cliente cadastrado com sucesso." };
-}
 
-export async function atualizarCliente(formData: FormData) {
-  if (!hasSupabaseEnv()) return;
+  if (id) {
+    redirect("/clientes");
+  }
 
-  const id = String(formData.get("id") ?? "").trim();
-  const nome = String(formData.get("nome") ?? "").trim();
-  const telefone = String(formData.get("telefone") ?? "").trim();
-  const endereco = String(formData.get("endereco") ?? "").trim();
-
-  if (!id || !nome) return;
-
-  const supabase = getSupabaseClient();
-  await supabase
-    .from("clientes")
-    .update({
-      nome,
-      telefone,
-      endereco,
-    })
-    .eq("id", id);
-
-  revalidatePath("/clientes");
+  return {
+    ok: true,
+    message: "Cliente cadastrado com sucesso.",
+  };
 }
 
 export async function excluirCliente(formData: FormData) {
-  if (!hasSupabaseEnv()) return;
+  if (!hasSupabaseEnv()) {
+    redirect("/clientes?erro=config");
+  }
 
   const id = String(formData.get("id") ?? "").trim();
-  if (!id) return;
+  if (!id) {
+    redirect("/clientes?erro=exclusao");
+  }
 
   const supabase = getSupabaseClient();
-  await supabase.from("clientes").delete().eq("id", id);
+  const { error } = await supabase.from("clientes").delete().eq("id", id);
+
+  if (error) {
+    if (error.code === "23503") {
+      redirect("/clientes?erro=cliente-com-pedidos");
+    }
+    redirect("/clientes?erro=exclusao");
+  }
 
   revalidatePath("/clientes");
+  redirect("/clientes");
 }

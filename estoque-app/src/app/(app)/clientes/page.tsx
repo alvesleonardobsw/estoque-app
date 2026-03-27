@@ -1,6 +1,8 @@
 import { ClienteForm } from "./cliente-form";
 import { getSupabaseClient, hasSupabaseEnv } from "@/lib/supabase";
-import { atualizarCliente, excluirCliente } from "./actions";
+import { excluirCliente } from "./actions";
+import { ConfirmDeleteButton } from "./confirm-delete-button";
+import Link from "next/link";
 
 type Cliente = {
   id: string;
@@ -27,8 +29,16 @@ async function listarClientes() {
   return { clientes: (data ?? []) as Cliente[], erro: "" };
 }
 
-export default async function ClientesPage() {
+type PageProps = {
+  searchParams: Promise<{ editar?: string; erro?: string }>;
+};
+
+export default async function ClientesPage({ searchParams }: PageProps) {
+  const params = await searchParams;
+  const editarId = typeof params.editar === "string" ? params.editar : "";
+  const erroAcao = typeof params.erro === "string" ? params.erro : "";
   const { clientes, erro } = await listarClientes();
+  const clienteEdicao = clientes.find((cliente) => cliente.id === editarId) ?? null;
 
   return (
     <section className="space-y-6">
@@ -45,12 +55,18 @@ export default async function ClientesPage() {
         </article>
       ) : null}
 
-      <ClienteForm />
+      <ClienteForm key={clienteEdicao?.id ?? "novo"} clienteEdicao={clienteEdicao} />
 
       {erro ? (
         <article className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
           Nao foi possivel carregar clientes ainda: {erro}. Execute o SQL de
           `supabase/schema.sql` no Supabase e recarregue a pagina.
+        </article>
+      ) : null}
+
+      {erroAcao === "cliente-com-pedidos" ? (
+        <article className="rounded-xl border border-red-300 bg-red-50 p-4 text-sm text-red-800">
+          Nao foi possivel excluir o cliente porque ele ja possui pedidos cadastrados.
         </article>
       ) : null}
 
@@ -70,51 +86,22 @@ export default async function ClientesPage() {
             <tbody>
               {clientes.map((cliente) => (
                 <tr key={cliente.id} className="border-b border-black/5">
-                  <td className="px-2 py-2">
-                    <input
-                      form={`editar-cliente-${cliente.id}`}
-                      name="nome"
-                      defaultValue={cliente.nome}
-                      className="w-full min-w-40 rounded-md border border-black/15 bg-white px-2 py-1 text-sm"
-                    />
-                  </td>
-                  <td className="px-2 py-2">
-                    <input
-                      form={`editar-cliente-${cliente.id}`}
-                      name="telefone"
-                      defaultValue={cliente.telefone ?? ""}
-                      className="w-full min-w-32 rounded-md border border-black/15 bg-white px-2 py-1 text-sm"
-                    />
-                  </td>
-                  <td className="px-2 py-2">
-                    <input
-                      form={`editar-cliente-${cliente.id}`}
-                      name="endereco"
-                      defaultValue={cliente.endereco ?? ""}
-                      className="w-full min-w-40 rounded-md border border-black/15 bg-white px-2 py-1 text-sm"
-                    />
-                  </td>
+                  <td className="px-2 py-2">{cliente.nome}</td>
+                  <td className="px-2 py-2">{cliente.telefone || "-"}</td>
+                  <td className="px-2 py-2">{cliente.endereco || "-"}</td>
                   <td className="px-2 py-2">
                     <div className="flex gap-2">
-                      <form id={`editar-cliente-${cliente.id}`} action={atualizarCliente}>
-                        <input type="hidden" name="id" value={cliente.id} />
-                        <button
-                          type="submit"
-                          className="rounded-md border border-black/20 px-2 py-1 text-xs"
-                        >
-                          Salvar
-                        </button>
-                      </form>
+                      <Link
+                        href={`/clientes?editar=${cliente.id}`}
+                        className="rounded-md border border-black/20 px-2 py-1 text-xs"
+                      >
+                        Editar
+                      </Link>
 
-                      <form action={excluirCliente}>
+                      <form id={`excluir-cliente-${cliente.id}`} action={excluirCliente}>
                         <input type="hidden" name="id" value={cliente.id} />
-                        <button
-                          type="submit"
-                          className="rounded-md border border-red-300 bg-red-50 px-2 py-1 text-xs text-red-700"
-                        >
-                          Excluir
-                        </button>
                       </form>
+                      <ConfirmDeleteButton formId={`excluir-cliente-${cliente.id}`} />
                     </div>
                   </td>
                 </tr>

@@ -2,7 +2,8 @@
 
 import { useMemo, useState } from "react";
 import { useActionState } from "react";
-import { criarPedido } from "./actions";
+import Link from "next/link";
+import { salvarPedido } from "./actions";
 
 type ClienteOption = {
   id: string;
@@ -21,6 +22,12 @@ type ItemForm = {
   quantidade: number;
 };
 
+type PedidoEdicao = {
+  id: string;
+  cliente_id: string;
+  itens: ItemForm[];
+};
+
 const initialState = {
   ok: false,
   message: "",
@@ -29,13 +36,18 @@ const initialState = {
 export function PedidoForm({
   clientes,
   produtos,
+  pedidoEdicao,
 }: {
   clientes: ClienteOption[];
   produtos: ProdutoOption[];
+  pedidoEdicao: PedidoEdicao | null;
 }) {
-  const [state, formAction, isPending] = useActionState(criarPedido, initialState);
-  const [itens, setItens] = useState<ItemForm[]>([{ produto_id: "", quantidade: 1 }]);
-  const [clienteId, setClienteId] = useState("");
+  const [state, formAction, isPending] = useActionState(salvarPedido, initialState);
+  const emEdicao = Boolean(pedidoEdicao);
+  const [itens, setItens] = useState<ItemForm[]>(
+    pedidoEdicao?.itens.length ? pedidoEdicao.itens : [{ produto_id: "", quantidade: 1 }],
+  );
+  const [clienteId, setClienteId] = useState(pedidoEdicao?.cliente_id ?? "");
 
   const produtosPorId = useMemo(() => {
     return new Map(produtos.map((produto) => [produto.id, produto]));
@@ -67,7 +79,8 @@ export function PedidoForm({
 
   return (
     <form action={formAction} className="space-y-4 rounded-xl border border-black/10 bg-surface p-4">
-      <h2 className="text-lg font-medium">Novo pedido</h2>
+      <h2 className="text-lg font-medium">{emEdicao ? "Editar pedido" : "Novo pedido"}</h2>
+      <input type="hidden" name="pedido_id" value={pedidoEdicao?.id ?? ""} />
 
       <label className="flex max-w-lg flex-col gap-1 text-sm">
         Cliente
@@ -191,8 +204,17 @@ export function PedidoForm({
         disabled={isPending || clientes.length === 0 || produtos.length === 0}
         className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-contrast disabled:cursor-not-allowed disabled:opacity-70"
       >
-        {isPending ? "Criando pedido..." : "Criar pedido"}
+        {isPending ? "Salvando..." : emEdicao ? "Salvar" : "Criar pedido"}
       </button>
+
+      {emEdicao ? (
+        <Link
+          href="/pedidos"
+          className="ml-2 inline-block rounded-lg border border-black/20 px-4 py-2 text-sm font-medium"
+        >
+          Cancelar
+        </Link>
+      ) : null}
     </form>
   );
 }

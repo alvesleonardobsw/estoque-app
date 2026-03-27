@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { getSupabaseClient, hasSupabaseEnv } from "@/lib/supabase";
 
 type ActionState = {
@@ -13,11 +14,12 @@ type PedidoItemInput = {
   quantidade: number;
 };
 
-export async function criarPedido(_: ActionState, formData: FormData): Promise<ActionState> {
+export async function salvarPedido(_: ActionState, formData: FormData): Promise<ActionState> {
   if (!hasSupabaseEnv()) {
     return { ok: false, message: "Configure o Supabase antes de criar pedidos." };
   }
 
+  const pedidoId = String(formData.get("pedido_id") ?? "").trim();
   const clienteId = String(formData.get("cliente_id") ?? "").trim();
   const itensBrutos = String(formData.get("itens") ?? "[]");
 
@@ -48,52 +50,30 @@ export async function criarPedido(_: ActionState, formData: FormData): Promise<A
   }
 
   const supabase = getSupabaseClient();
-  const { error } = await supabase.rpc("registrar_pedido", {
-    p_cliente_id: clienteId,
-    p_itens: itens,
-  });
+  const { error } = pedidoId
+    ? await supabase.rpc("atualizar_pedido", {
+        p_pedido_id: pedidoId,
+        p_cliente_id: clienteId,
+        p_itens: itens,
+      })
+    : await supabase.rpc("registrar_pedido", {
+        p_cliente_id: clienteId,
+        p_itens: itens,
+      });
 
   if (error) {
-    return { ok: false, message: `Erro ao criar pedido: ${error.message}` };
+    return { ok: false, message: `Erro ao salvar pedido: ${error.message}` };
   }
 
   revalidatePath("/pedidos");
   revalidatePath("/produtos");
   revalidatePath("/");
 
+  if (pedidoId) {
+    redirect("/pedidos");
+  }
+
   return { ok: true, message: "Pedido criado com sucesso. Estoque atualizado." };
-}
-
-export async function atualizarPedido(formData: FormData) {
-  if (!hasSupabaseEnv()) return;
-
-  const pedidoId = String(formData.get("pedido_id") ?? "").trim();
-  const clienteId = String(formData.get("cliente_id") ?? "").trim();
-  const produtoIds = formData.getAll("produto_id").map((value) => String(value).trim());
-  const quantidades = formData.getAll("quantidade").map((value) => Number(value));
-
-  if (!pedidoId || !clienteId) return;
-  if (produtoIds.length === 0 || produtoIds.length !== quantidades.length) return;
-
-  const itens = produtoIds
-    .map((produtoId, index) => ({
-      produto_id: produtoId,
-      quantidade: quantidades[index],
-    }))
-    .filter((item) => item.produto_id && Number.isInteger(item.quantidade) && item.quantidade > 0);
-
-  if (itens.length === 0) return;
-
-  const supabase = getSupabaseClient();
-  await supabase.rpc("atualizar_pedido", {
-    p_pedido_id: pedidoId,
-    p_cliente_id: clienteId,
-    p_itens: itens,
-  });
-
-  revalidatePath("/pedidos");
-  revalidatePath("/produtos");
-  revalidatePath("/");
 }
 
 export async function excluirPedido(formData: FormData) {
