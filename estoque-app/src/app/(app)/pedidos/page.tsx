@@ -1,6 +1,6 @@
 import { getSupabaseClient, hasSupabaseEnv } from "@/lib/supabase";
 import { PedidoForm } from "./pedido-form";
-import { excluirPedido } from "./actions";
+import { atualizarStatusPedido, excluirPedido } from "./actions";
 import Link from "next/link";
 import { ConfirmDeletePedidoButton } from "./confirm-delete-button";
 import { EditIcon } from "@/components/action-icons";
@@ -20,6 +20,8 @@ type Produto = {
 type PedidoLista = {
   id: string;
   cliente_id: string;
+  status: "pendente" | "entregue";
+  data_entrega: string | null;
   total: number;
   created_at: string;
   clientes: {
@@ -37,7 +39,7 @@ type PedidoLista = {
   }[];
 };
 
-async function carregarDadosPedidos() {
+async function carregarDadosPedidos(statusFiltro: "todos" | "pendente" | "entregue") {
   if (!hasSupabaseEnv()) {
     return {
       clientes: [] as Cliente[],
@@ -49,19 +51,25 @@ async function carregarDadosPedidos() {
 
   const supabase = getSupabaseClient();
 
+  let pedidosQuery = supabase
+    .from("pedidos")
+    .select(
+      "id, cliente_id, status, data_entrega, total, created_at, clientes(id, nome), pedido_itens(id, produto_id, quantidade, subtotal, produtos(nome))",
+    )
+    .order("created_at", { ascending: false })
+    .limit(10);
+
+  if (statusFiltro !== "todos") {
+    pedidosQuery = pedidosQuery.eq("status", statusFiltro);
+  }
+
   const [clientesResp, produtosResp, pedidosResp] = await Promise.all([
     supabase.from("clientes").select("id, nome").order("nome", { ascending: true }),
     supabase
       .from("produtos")
       .select("id, nome, preco, estoque_atual")
       .order("nome", { ascending: true }),
-    supabase
-      .from("pedidos")
-      .select(
-        "id, cliente_id, total, created_at, clientes(id, nome), pedido_itens(id, produto_id, quantidade, subtotal, produtos(nome))",
-      )
-      .order("created_at", { ascending: false })
-      .limit(10),
+    pedidosQuery,
   ]);
 
   const erro =
@@ -99,14 +107,16 @@ function extrairNomeRelacao(
 }
 
 type PageProps = {
-  searchParams: Promise<{ editar?: string; novo?: string }>;
+  searchParams: Promise<{ editar?: string; novo?: string; status?: string }>;
 };
 
 export default async function PedidosPage({ searchParams }: PageProps) {
   const params = await searchParams;
   const editarId = typeof params.editar === "string" ? params.editar : "";
   const novo = typeof params.novo === "string" ? params.novo : "";
-  const { clientes, produtos, pedidos, erro } = await carregarDadosPedidos();
+  const statusFiltro =
+    params.status === "pendente" || params.status === "entregue" ? params.status : "todos";
+  const { clientes, produtos, pedidos, erro } = await carregarDadosPedidos(statusFiltro);
   const pedidoEdicao = pedidos.find((pedido) => pedido.id === editarId);
   const mostrarFormulario = Boolean(pedidoEdicao) || novo === "1";
 
@@ -164,7 +174,35 @@ export default async function PedidosPage({ searchParams }: PageProps) {
       ) : null}
 
       <article className="rounded-xl border border-black/10 bg-surface p-4">
-        <h2 className="text-lg font-medium">Ultimos pedidos</h2>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <h2 className="text-lg font-medium">Ultimos pedidos</h2>
+          <div className="flex gap-2 text-xs">
+            <Link
+              href="/pedidos?status=todos"
+              className={`rounded-md border px-2 py-1 ${
+                statusFiltro === "todos" ? "border-primary bg-primary text-primary-contrast" : "border-black/20"
+              }`}
+            >
+              Todos
+            </Link>
+            <Link
+              href="/pedidos?status=pendente"
+              className={`rounded-md border px-2 py-1 ${
+                statusFiltro === "pendente" ? "border-primary bg-primary text-primary-contrast" : "border-black/20"
+              }`}
+            >
+              Pendentes
+            </Link>
+            <Link
+              href="/pedidos?status=entregue"
+              className={`rounded-md border px-2 py-1 ${
+                statusFiltro === "entregue" ? "border-primary bg-primary text-primary-contrast" : "border-black/20"
+              }`}
+            >
+              Entregues
+            </Link>
+          </div>
+        </div>
 
         {pedidos.length === 0 ? (
           <p className="mt-3 text-sm text-foreground/70">Nenhum pedido criado ainda.</p>
@@ -178,9 +216,25 @@ export default async function PedidosPage({ searchParams }: PageProps) {
                   </p>
                   <p className="text-sm text-foreground/70">{formatarData(pedido.created_at)}</p>
                 </div>
+                <p className="mt-1">
+                  <span
+                    className={`inline-flex rounded-full px-2 py-1 text-xs font-medium ${
+                      pedido.status === "entregue"
+                        ? "bg-green-100 text-green-800"
+                        : "bg-amber-100 text-amber-800"
+                    }`}
+                  >
+                    {pedido.status === "entregue" ? "Entregue" : "Pendente"}
+                  </span>
+                </p>
                 <p className="mt-1 text-sm">
                   Total: <span className="font-semibold text-primary">{formatarMoeda(pedido.total)}</span>
                 </p>
+                {pedido.data_entrega ? (
+                  <p className="mt-1 text-xs text-foreground/70">
+                    Entregue em: {formatarData(pedido.data_entrega)}
+                  </p>
+                ) : null}
                 <ul className="mt-2 space-y-1 text-sm text-foreground/80">
                   {pedido.pedido_itens.map((item) => (
                     <li key={item.id}>
@@ -191,6 +245,20 @@ export default async function PedidosPage({ searchParams }: PageProps) {
                 </ul>
 
                 <div className="mt-3 flex gap-2">
+                  <form action={atualizarStatusPedido}>
+                    <input type="hidden" name="pedido_id" value={pedido.id} />
+                    <input
+                      type="hidden"
+                      name="status"
+                      value={pedido.status === "entregue" ? "pendente" : "entregue"}
+                    />
+                    <button
+                      type="submit"
+                      className="rounded-md border border-black/20 px-2 py-1 text-xs"
+                    >
+                      {pedido.status === "entregue" ? "Marcar pendente" : "Marcar entregue"}
+                    </button>
+                  </form>
                   <Link
                     href={`/pedidos?editar=${pedido.id}`}
                     className="rounded-md border border-black/20 p-2 text-xs"

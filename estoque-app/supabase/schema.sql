@@ -81,9 +81,17 @@ using (true);
 create table if not exists public.pedidos (
   id uuid primary key default gen_random_uuid(),
   cliente_id uuid not null references public.clientes (id),
+  status text not null default 'pendente' check (status in ('pendente', 'entregue')),
+  data_entrega timestamptz,
   total numeric(12, 2) not null default 0 check (total >= 0),
   created_at timestamptz not null default now()
 );
+
+alter table public.pedidos
+  add column if not exists status text not null default 'pendente';
+
+alter table public.pedidos
+  add column if not exists data_entrega timestamptz;
 
 create table if not exists public.pedido_itens (
   id uuid primary key default gen_random_uuid(),
@@ -421,3 +429,37 @@ end;
 $$;
 
 grant execute on function public.excluir_pedido(uuid) to anon;
+
+create or replace function public.atualizar_status_pedido(p_pedido_id uuid, p_status text)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if p_pedido_id is null then
+    raise exception 'Pedido invalido.';
+  end if;
+
+  if p_status not in ('pendente', 'entregue') then
+    raise exception 'Status invalido.';
+  end if;
+
+  update public.pedidos
+  set
+    status = p_status,
+    data_entrega = case
+      when p_status = 'entregue' then now()
+      else null
+    end
+  where id = p_pedido_id;
+
+  if not found then
+    raise exception 'Pedido nao encontrado.';
+  end if;
+
+  return p_pedido_id;
+end;
+$$;
+
+grant execute on function public.atualizar_status_pedido(uuid, text) to anon;

@@ -91,3 +91,21 @@ export async function excluirPedido(formData: FormData) {
   revalidatePath("/produtos");
   revalidatePath("/");
 }
+
+export async function atualizarStatusPedido(formData: FormData) {
+  if (!hasSupabaseEnv()) return;
+
+  const pedidoId = String(formData.get("pedido_id") ?? "").trim();
+  const status = String(formData.get("status") ?? "").trim();
+  if (!pedidoId) return;
+  if (status !== "pendente" && status !== "entregue") return;
+
+  const supabase = getSupabaseClient();
+  await supabase.rpc("atualizar_status_pedido", {
+    p_pedido_id: pedidoId,
+    p_status: status,
+  });
+
+  revalidatePath("/pedidos");
+  revalidatePath("/");
+}

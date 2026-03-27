@@ -58,7 +58,9 @@ async function carregarDashboard() {
       totalProdutos: 0,
       totalEstoque: 0,
       pedidosHoje: 0,
+      pedidosPendentes: 0,
       vendasHoje: 0,
+      vendasMes: 0,
       ultimosPedidos: [] as PedidoResumo[],
       produtosBaixoEstoque: [] as ProdutoEstoque[],
       erro: "",
@@ -68,8 +70,9 @@ async function carregarDashboard() {
   const supabase = getSupabaseClient();
   const inicioHoje = new Date();
   inicioHoje.setHours(0, 0, 0, 0);
+  const inicioMes = new Date(inicioHoje.getFullYear(), inicioHoje.getMonth(), 1);
 
-  const [clientesResp, produtosCountResp, produtosResp, pedidosHojeResp, pedidosResp] =
+  const [clientesResp, produtosCountResp, produtosResp, pedidosHojeResp, pedidosMesResp, pedidosResp, pedidosPendentesResp] =
     await Promise.all([
       supabase.from("clientes").select("id", { count: "exact", head: true }),
       supabase.from("produtos").select("id", { count: "exact", head: true }),
@@ -80,9 +83,14 @@ async function carregarDashboard() {
         .gte("created_at", inicioHoje.toISOString()),
       supabase
         .from("pedidos")
+        .select("id, total, created_at")
+        .gte("created_at", inicioMes.toISOString()),
+      supabase
+        .from("pedidos")
         .select("id, total, created_at, clientes(nome)")
         .order("created_at", { ascending: false })
         .limit(5),
+      supabase.from("pedidos").select("id", { count: "exact", head: true }).eq("status", "pendente"),
     ]);
 
   const erro =
@@ -90,14 +98,18 @@ async function carregarDashboard() {
     produtosCountResp.error?.message ||
     produtosResp.error?.message ||
     pedidosHojeResp.error?.message ||
+    pedidosMesResp.error?.message ||
     pedidosResp.error?.message ||
+    pedidosPendentesResp.error?.message ||
     "";
 
   const produtos = (produtosResp.data ?? []) as ProdutoEstoque[];
   const pedidosHoje = pedidosHojeResp.data ?? [];
+  const pedidosMes = pedidosMesResp.data ?? [];
 
   const totalEstoque = produtos.reduce((acc, produto) => acc + produto.estoque_atual, 0);
   const vendasHoje = pedidosHoje.reduce((acc, pedido) => acc + Number(pedido.total ?? 0), 0);
+  const vendasMes = pedidosMes.reduce((acc, pedido) => acc + Number(pedido.total ?? 0), 0);
   const produtosBaixoEstoque = produtos.filter((produto) => produto.estoque_atual <= 5).slice(0, 5);
 
   return {
@@ -105,7 +117,9 @@ async function carregarDashboard() {
     totalProdutos: produtosCountResp.count ?? 0,
     totalEstoque,
     pedidosHoje: pedidosHoje.length,
+    pedidosPendentes: pedidosPendentesResp.count ?? 0,
     vendasHoje,
+    vendasMes,
     ultimosPedidos: (pedidosResp.data ?? []) as PedidoResumo[],
     produtosBaixoEstoque,
     erro,
@@ -153,9 +167,19 @@ export default async function DashboardPage() {
           subtitle="Soma das unidades em estoque"
         />
         <InfoCard
+          title="Pedidos Pendentes"
+          value={String(dados.pedidosPendentes)}
+          subtitle="Aguardando entrega"
+        />
+        <InfoCard
           title="Vendas do Dia"
           value={formatarMoeda(dados.vendasHoje)}
           subtitle={`${dados.pedidosHoje} pedido(s) hoje`}
+        />
+        <InfoCard
+          title="Vendas do Mes"
+          value={formatarMoeda(dados.vendasMes)}
+          subtitle="Acumulado do mes atual"
         />
       </div>
 
