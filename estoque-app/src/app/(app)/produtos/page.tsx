@@ -193,6 +193,7 @@ export default async function ProdutosPage({ searchParams }: PageProps) {
               className="rounded-md border border-black/15 bg-white px-2 py-2"
             >
               <option value="">Todos</option>
+              <option value="50g">50g</option>
               <option value="350g">350g</option>
               <option value="500g">500g</option>
               <option value="1kg">1kg</option>
