@@ -63,3 +63,51 @@ export async function criarPedido(_: ActionState, formData: FormData): Promise<A
 
   return { ok: true, message: "Pedido criado com sucesso. Estoque atualizado." };
 }
+
+export async function atualizarPedido(formData: FormData) {
+  if (!hasSupabaseEnv()) return;
+
+  const pedidoId = String(formData.get("pedido_id") ?? "").trim();
+  const clienteId = String(formData.get("cliente_id") ?? "").trim();
+  const produtoIds = formData.getAll("produto_id").map((value) => String(value).trim());
+  const quantidades = formData.getAll("quantidade").map((value) => Number(value));
+
+  if (!pedidoId || !clienteId) return;
+  if (produtoIds.length === 0 || produtoIds.length !== quantidades.length) return;
+
+  const itens = produtoIds
+    .map((produtoId, index) => ({
+      produto_id: produtoId,
+      quantidade: quantidades[index],
+    }))
+    .filter((item) => item.produto_id && Number.isInteger(item.quantidade) && item.quantidade > 0);
+
+  if (itens.length === 0) return;
+
+  const supabase = getSupabaseClient();
+  await supabase.rpc("atualizar_pedido", {
+    p_pedido_id: pedidoId,
+    p_cliente_id: clienteId,
+    p_itens: itens,
+  });
+
+  revalidatePath("/pedidos");
+  revalidatePath("/produtos");
+  revalidatePath("/");
+}
+
+export async function excluirPedido(formData: FormData) {
+  if (!hasSupabaseEnv()) return;
+
+  const pedidoId = String(formData.get("pedido_id") ?? "").trim();
+  if (!pedidoId) return;
+
+  const supabase = getSupabaseClient();
+  await supabase.rpc("excluir_pedido", {
+    p_pedido_id: pedidoId,
+  });
+
+  revalidatePath("/pedidos");
+  revalidatePath("/produtos");
+  revalidatePath("/");
+}

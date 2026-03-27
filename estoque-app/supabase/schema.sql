@@ -229,3 +229,195 @@ end;
 $$;
 
 grant execute on function public.registrar_pedido(uuid, jsonb) to anon;
+
+create or replace function public.atualizar_pedido(p_pedido_id uuid, p_cliente_id uuid, p_itens jsonb)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_item jsonb;
+  v_produto_id uuid;
+  v_quantidade integer;
+  v_preco numeric(10, 2);
+  v_estoque integer;
+  v_total numeric(12, 2) := 0;
+  v_item_antigo record;
+begin
+  if p_pedido_id is null then
+    raise exception 'Pedido invalido.';
+  end if;
+
+  if p_cliente_id is null then
+    raise exception 'Cliente invalido.';
+  end if;
+
+  if p_itens is null
+    or jsonb_typeof(p_itens) <> 'array'
+    or jsonb_array_length(p_itens) = 0 then
+    raise exception 'Informe ao menos um item no pedido.';
+  end if;
+
+  perform 1
+  from public.pedidos
+  where id = p_pedido_id
+  for update;
+
+  if not found then
+    raise exception 'Pedido nao encontrado.';
+  end if;
+
+  for v_item_antigo in
+    select produto_id, quantidade
+    from public.pedido_itens
+    where pedido_id = p_pedido_id
+  loop
+    update public.produtos
+    set estoque_atual = estoque_atual + v_item_antigo.quantidade
+    where id = v_item_antigo.produto_id;
+
+    insert into public.estoque_movimentos (
+      produto_id,
+      pedido_id,
+      tipo,
+      quantidade,
+      observacao
+    )
+    values (
+      v_item_antigo.produto_id,
+      p_pedido_id,
+      'entrada',
+      v_item_antigo.quantidade,
+      'Devolucao por alteracao de pedido'
+    );
+  end loop;
+
+  delete from public.pedido_itens where pedido_id = p_pedido_id;
+
+  for v_item in
+    select value from jsonb_array_elements(p_itens)
+  loop
+    v_produto_id := (v_item ->> 'produto_id')::uuid;
+    v_quantidade := (v_item ->> 'quantidade')::integer;
+
+    if v_produto_id is null or v_quantidade is null or v_quantidade <= 0 then
+      raise exception 'Item de pedido invalido.';
+    end if;
+
+    select preco, estoque_atual
+    into v_preco, v_estoque
+    from public.produtos
+    where id = v_produto_id
+    for update;
+
+    if not found then
+      raise exception 'Produto nao encontrado.';
+    end if;
+
+    if v_estoque < v_quantidade then
+      raise exception 'Estoque insuficiente para o produto selecionado.';
+    end if;
+
+    update public.produtos
+    set estoque_atual = estoque_atual - v_quantidade
+    where id = v_produto_id;
+
+    insert into public.pedido_itens (
+      pedido_id,
+      produto_id,
+      quantidade,
+      preco_unitario,
+      subtotal
+    )
+    values (
+      p_pedido_id,
+      v_produto_id,
+      v_quantidade,
+      v_preco,
+      v_preco * v_quantidade
+    );
+
+    insert into public.estoque_movimentos (
+      produto_id,
+      pedido_id,
+      tipo,
+      quantidade,
+      observacao
+    )
+    values (
+      v_produto_id,
+      p_pedido_id,
+      'saida',
+      v_quantidade,
+      'Baixa por alteracao de pedido'
+    );
+
+    v_total := v_total + (v_preco * v_quantidade);
+  end loop;
+
+  update public.pedidos
+  set cliente_id = p_cliente_id,
+      total = v_total
+  where id = p_pedido_id;
+
+  return p_pedido_id;
+end;
+$$;
+
+grant execute on function public.atualizar_pedido(uuid, uuid, jsonb) to anon;
+
+create or replace function public.excluir_pedido(p_pedido_id uuid)
+returns boolean
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_item record;
+begin
+  if p_pedido_id is null then
+    raise exception 'Pedido invalido.';
+  end if;
+
+  perform 1
+  from public.pedidos
+  where id = p_pedido_id
+  for update;
+
+  if not found then
+    raise exception 'Pedido nao encontrado.';
+  end if;
+
+  for v_item in
+    select produto_id, quantidade
+    from public.pedido_itens
+    where pedido_id = p_pedido_id
+  loop
+    update public.produtos
+    set estoque_atual = estoque_atual + v_item.quantidade
+    where id = v_item.produto_id;
+
+    insert into public.estoque_movimentos (
+      produto_id,
+      pedido_id,
+      tipo,
+      quantidade,
+      observacao
+    )
+    values (
+      v_item.produto_id,
+      p_pedido_id,
+      'entrada',
+      v_item.quantidade,
+      'Devolucao por exclusao de pedido'
+    );
+  end loop;
+
+  delete from public.pedidos where id = p_pedido_id;
+
+  return true;
+end;
+$$;
+
+grant execute on function public.excluir_pedido(uuid) to anon;
