@@ -16,7 +16,13 @@ const initialState = {
   message: "",
 };
 
-export function ClienteForm({ clienteEdicao }: { clienteEdicao: ClienteEdicao | null }) {
+export function ClienteForm({
+  clienteEdicao,
+  mostrarCancelarNovo,
+}: {
+  clienteEdicao: ClienteEdicao | null;
+  mostrarCancelarNovo: boolean;
+}) {
   const [state, formAction, isPending] = useActionState(salvarCliente, initialState);
   const emEdicao = Boolean(clienteEdicao);
 
@@ -78,7 +84,7 @@ export function ClienteForm({ clienteEdicao }: { clienteEdicao: ClienteEdicao | 
           {isPending ? "Salvando..." : emEdicao ? "Salvar" : "Cadastrar cliente"}
         </button>
 
-        {emEdicao ? (
+        {emEdicao || mostrarCancelarNovo ? (
           <Link
             href="/clientes"
             className="rounded-lg border border-black/20 px-4 py-2 text-sm font-medium"

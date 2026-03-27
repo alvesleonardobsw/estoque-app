@@ -31,21 +31,33 @@ async function listarClientes() {
 }
 
 type PageProps = {
-  searchParams: Promise<{ editar?: string; erro?: string }>;
+  searchParams: Promise<{ editar?: string; erro?: string; novo?: string }>;
 };
 
 export default async function ClientesPage({ searchParams }: PageProps) {
   const params = await searchParams;
   const editarId = typeof params.editar === "string" ? params.editar : "";
   const erroAcao = typeof params.erro === "string" ? params.erro : "";
+  const novo = typeof params.novo === "string" ? params.novo : "";
   const { clientes, erro } = await listarClientes();
   const clienteEdicao = clientes.find((cliente) => cliente.id === editarId) ?? null;
+  const mostrarFormulario = Boolean(clienteEdicao) || novo === "1";
 
   return (
     <section className="space-y-6">
-      <header>
-        <p className="text-sm text-foreground/70">Cadastro</p>
-        <h1 className="text-2xl font-semibold">Clientes</h1>
+      <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="text-sm text-foreground/70">Cadastro</p>
+          <h1 className="text-2xl font-semibold">Clientes</h1>
+        </div>
+        {!mostrarFormulario ? (
+          <Link
+            href="/clientes?novo=1"
+            className="inline-block rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-contrast"
+          >
+            Cadastrar cliente
+          </Link>
+        ) : null}
       </header>
 
       {!hasSupabaseEnv() ? (
@@ -56,7 +68,13 @@ export default async function ClientesPage({ searchParams }: PageProps) {
         </article>
       ) : null}
 
-      <ClienteForm key={clienteEdicao?.id ?? "novo"} clienteEdicao={clienteEdicao} />
+      {mostrarFormulario ? (
+        <ClienteForm
+          key={clienteEdicao?.id ?? "novo"}
+          clienteEdicao={clienteEdicao}
+          mostrarCancelarNovo={!clienteEdicao}
+        />
+      ) : null}
 
       {erro ? (
         <article className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
