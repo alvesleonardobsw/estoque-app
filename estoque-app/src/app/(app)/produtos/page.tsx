@@ -1,8 +1,7 @@
 import { getSupabaseClient, hasSupabaseEnv } from "@/lib/supabase";
 import { ProdutoForm } from "./produto-form";
-import { excluirProduto } from "./actions";
 import Link from "next/link";
-import { EditIcon, TrashIcon } from "@/components/action-icons";
+import { EditIcon } from "@/components/action-icons";
 
 type Produto = {
   id: string;
@@ -248,18 +247,6 @@ export default async function ProdutosPage({ searchParams }: PageProps) {
                       >
                         <EditIcon />
                       </Link>
-
-                      <form action={excluirProduto}>
-                        <input type="hidden" name="id" value={produto.id} />
-                        <button
-                          type="submit"
-                          className="rounded-md border border-red-300 bg-red-50 p-2 text-xs text-red-700"
-                          aria-label="Excluir produto"
-                          title="Excluir produto"
-                        >
-                          <TrashIcon />
-                        </button>
-                      </form>
                     </div>
                   </td>
                 </tr>
