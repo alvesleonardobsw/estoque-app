@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { getSupabaseClient, hasSupabaseEnv } from "@/lib/supabase";
 
 type ActionState = {
@@ -8,14 +9,15 @@ type ActionState = {
   message: string;
 };
 
-export async function criarProduto(_: ActionState, formData: FormData): Promise<ActionState> {
+export async function salvarProduto(_: ActionState, formData: FormData): Promise<ActionState> {
   if (!hasSupabaseEnv()) {
     return { ok: false, message: "Configure o Supabase antes de cadastrar produtos." };
   }
 
+  const id = String(formData.get("id") ?? "").trim();
   const nome = String(formData.get("nome") ?? "").trim();
   const precoTexto = String(formData.get("preco") ?? "").replace(",", ".").trim();
-  const estoqueTexto = String(formData.get("estoque") ?? "").trim();
+  const estoqueTexto = String(formData.get("estoque_atual") ?? "").trim();
 
   const preco = Number(precoTexto);
   const estoque = Number(estoqueTexto);
@@ -33,46 +35,31 @@ export async function criarProduto(_: ActionState, formData: FormData): Promise<
   }
 
   const supabase = getSupabaseClient();
-  const { error } = await supabase.from("produtos").insert({
-    nome,
-    preco,
-    estoque_atual: estoque,
-  });
+  const { error } = id
+    ? await supabase
+        .from("produtos")
+        .update({
+          nome,
+          preco,
+          estoque_atual: estoque,
+        })
+        .eq("id", id)
+    : await supabase.from("produtos").insert({
+        nome,
+        preco,
+        estoque_atual: estoque,
+      });
 
   if (error) {
     return { ok: false, message: `Erro ao salvar produto: ${error.message}` };
   }
 
   revalidatePath("/produtos");
+  if (id) {
+    redirect("/produtos");
+  }
+
   return { ok: true, message: "Produto cadastrado com sucesso." };
-}
-
-export async function atualizarProduto(formData: FormData) {
-  if (!hasSupabaseEnv()) return;
-
-  const id = String(formData.get("id") ?? "").trim();
-  const nome = String(formData.get("nome") ?? "").trim();
-  const precoTexto = String(formData.get("preco") ?? "").replace(",", ".").trim();
-  const estoqueTexto = String(formData.get("estoque_atual") ?? "").trim();
-
-  const preco = Number(precoTexto);
-  const estoque = Number(estoqueTexto);
-
-  if (!id || !nome) return;
-  if (!Number.isFinite(preco) || preco < 0) return;
-  if (!Number.isInteger(estoque) || estoque < 0) return;
-
-  const supabase = getSupabaseClient();
-  await supabase
-    .from("produtos")
-    .update({
-      nome,
-      preco,
-      estoque_atual: estoque,
-    })
-    .eq("id", id);
-
-  revalidatePath("/produtos");
 }
 
 export async function excluirProduto(formData: FormData) {

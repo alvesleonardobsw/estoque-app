@@ -1,6 +1,7 @@
 import { getSupabaseClient, hasSupabaseEnv } from "@/lib/supabase";
 import { ProdutoForm } from "./produto-form";
-import { atualizarProduto, excluirProduto } from "./actions";
+import { excluirProduto } from "./actions";
+import Link from "next/link";
 
 type Produto = {
   id: string;
@@ -34,8 +35,15 @@ function formatarPreco(valor: number) {
   }).format(valor);
 }
 
-export default async function ProdutosPage() {
+type PageProps = {
+  searchParams: Promise<{ editar?: string }>;
+};
+
+export default async function ProdutosPage({ searchParams }: PageProps) {
+  const params = await searchParams;
+  const editarId = typeof params.editar === "string" ? params.editar : "";
   const { produtos, erro } = await listarProdutos();
+  const produtoEdicao = produtos.find((produto) => produto.id === editarId) ?? null;
 
   return (
     <section className="space-y-6">
@@ -52,7 +60,7 @@ export default async function ProdutosPage() {
         </article>
       ) : null}
 
-      <ProdutoForm />
+      <ProdutoForm key={produtoEdicao?.id ?? "novo"} produtoEdicao={produtoEdicao} />
 
       {erro ? (
         <article className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
@@ -77,48 +85,17 @@ export default async function ProdutosPage() {
             <tbody>
               {produtos.map((produto) => (
                 <tr key={produto.id} className="border-b border-black/5">
-                  <td className="px-2 py-2">
-                    <input
-                      form={`editar-produto-${produto.id}`}
-                      name="nome"
-                      defaultValue={produto.nome}
-                      className="w-full min-w-40 rounded-md border border-black/15 bg-white px-2 py-1 text-sm"
-                    />
-                  </td>
-                  <td className="px-2 py-2">
-                    <input
-                      form={`editar-produto-${produto.id}`}
-                      name="preco"
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      defaultValue={produto.preco}
-                      className="w-full min-w-28 rounded-md border border-black/15 bg-white px-2 py-1 text-sm"
-                    />
-                    <p className="mt-1 text-xs text-foreground/60">{formatarPreco(produto.preco)}</p>
-                  </td>
-                  <td className="px-2 py-2">
-                    <input
-                      form={`editar-produto-${produto.id}`}
-                      name="estoque_atual"
-                      type="number"
-                      min="0"
-                      step="1"
-                      defaultValue={produto.estoque_atual}
-                      className="w-full min-w-24 rounded-md border border-black/15 bg-white px-2 py-1 text-sm"
-                    />
-                  </td>
+                  <td className="px-2 py-2">{produto.nome}</td>
+                  <td className="px-2 py-2">{formatarPreco(produto.preco)}</td>
+                  <td className="px-2 py-2">{produto.estoque_atual}</td>
                   <td className="px-2 py-2">
                     <div className="flex gap-2">
-                      <form id={`editar-produto-${produto.id}`} action={atualizarProduto}>
-                        <input type="hidden" name="id" value={produto.id} />
-                        <button
-                          type="submit"
-                          className="rounded-md border border-black/20 px-2 py-1 text-xs"
-                        >
-                          Salvar
-                        </button>
-                      </form>
+                      <Link
+                        href={`/produtos?editar=${produto.id}`}
+                        className="rounded-md border border-black/20 px-2 py-1 text-xs"
+                      >
+                        Editar
+                      </Link>
 
                       <form action={excluirProduto}>
                         <input type="hidden" name="id" value={produto.id} />
