@@ -96,3 +96,21 @@ export function UndoIcon({ className = "h-4 w-4" }: IconProps) {
     </svg>
   );
 }
+
+export function MapPinIcon({ className = "h-4 w-4" }: IconProps) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden="true"
+    >
+      <path d="M12 22s7-5.5 7-12a7 7 0 1 0-14 0c0 6.5 7 12 7 12z" />
+      <circle cx="12" cy="10" r="2.5" />
+    </svg>
+  );
+}

@@ -1,7 +1,7 @@
 import { ClienteForm } from "./cliente-form";
 import { getSupabaseClient, hasSupabaseEnv } from "@/lib/supabase";
 import Link from "next/link";
-import { EditIcon } from "@/components/action-icons";
+import { EditIcon, MapPinIcon } from "@/components/action-icons";
 
 type Cliente = {
   id: string;
@@ -108,6 +108,28 @@ export default async function ClientesPage({ searchParams }: PageProps) {
                   <td className="px-2 py-2">{cliente.endereco || "-"}</td>
                   <td className="px-2 py-2">
                     <div className="flex gap-2">
+                      {cliente.endereco ? (
+                        <Link
+                          href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+                            cliente.endereco,
+                          )}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="rounded-md border border-black/20 p-2 text-xs"
+                          aria-label="Abrir endereco no Google Maps"
+                          title="Ver no Google Maps"
+                        >
+                          <MapPinIcon />
+                        </Link>
+                      ) : (
+                        <span
+                          className="cursor-not-allowed rounded-md border border-black/10 p-2 text-xs text-black/30"
+                          title="Cliente sem endereco cadastrado"
+                        >
+                          <MapPinIcon />
+                        </span>
+                      )}
+
                       <Link
                         href={`/clientes?editar=${cliente.id}`}
                         className="rounded-md border border-black/20 p-2 text-xs"
