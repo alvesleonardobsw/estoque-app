@@ -35,6 +35,7 @@ type PedidoEdicaoItem = {
 type PedidoEdicao = {
   id: string;
   cliente_id: string;
+  data_entrega_prevista: string | null;
   itens: PedidoEdicaoItem[];
 };
 
@@ -144,6 +145,16 @@ export function PedidoForm({
             </option>
           ))}
         </select>
+      </label>
+
+      <label className="flex max-w-xs flex-col gap-1 text-sm">
+        Data de Entrega
+        <input
+          type="date"
+          name="data_entrega_prevista"
+          defaultValue={pedidoEdicao?.data_entrega_prevista ?? ""}
+          className="rounded-lg border border-black/15 bg-white px-3 py-2 outline-none ring-primary/40 focus:ring"
+        />
       </label>
 
       <div className="space-y-3">

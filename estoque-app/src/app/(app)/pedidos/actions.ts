@@ -21,7 +21,12 @@ export async function salvarPedido(_: ActionState, formData: FormData): Promise<
 
   const pedidoId = String(formData.get("pedido_id") ?? "").trim();
   const clienteId = String(formData.get("cliente_id") ?? "").trim();
+  const dataEntregaPrevistaRaw = String(formData.get("data_entrega_prevista") ?? "").trim();
   const itensBrutos = String(formData.get("itens") ?? "[]");
+
+  if (dataEntregaPrevistaRaw && !/^\d{4}-\d{2}-\d{2}$/.test(dataEntregaPrevistaRaw)) {
+    return { ok: false, message: "Data de entrega invalida." };
+  }
 
   if (!clienteId) {
     return { ok: false, message: "Selecione um cliente." };
@@ -50,7 +55,7 @@ export async function salvarPedido(_: ActionState, formData: FormData): Promise<
   }
 
   const supabase = getSupabaseClient();
-  const { error } = pedidoId
+  const { data, error } = pedidoId
     ? await supabase.rpc("atualizar_pedido", {
         p_pedido_id: pedidoId,
         p_cliente_id: clienteId,
@@ -63,6 +68,21 @@ export async function salvarPedido(_: ActionState, formData: FormData): Promise<
 
   if (error) {
     return { ok: false, message: `Erro ao salvar pedido: ${error.message}` };
+  }
+
+  const pedidoPersistidoId = pedidoId || (typeof data === "string" ? data : "");
+  if (pedidoPersistidoId) {
+    const { error: erroDataEntrega } = await supabase.rpc("atualizar_data_entrega_prevista_pedido", {
+      p_pedido_id: pedidoPersistidoId,
+      p_data_entrega_prevista: dataEntregaPrevistaRaw || null,
+    });
+
+    if (erroDataEntrega) {
+      return {
+        ok: false,
+        message: `Pedido salvo, mas falhou ao salvar data de entrega: ${erroDataEntrega.message}`,
+      };
+    }
   }
 
   revalidatePath("/pedidos");

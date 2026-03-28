@@ -22,6 +22,7 @@ type PedidoLista = {
   id: string;
   cliente_id: string;
   status: "pendente" | "entregue";
+  data_entrega_prevista: string | null;
   data_entrega: string | null;
   total: number;
   created_at: string;
@@ -55,7 +56,7 @@ async function carregarDadosPedidos(statusFiltro: "todos" | "pendente" | "entreg
   let pedidosQuery = supabase
     .from("pedidos")
     .select(
-      "id, cliente_id, status, data_entrega, total, created_at, clientes(id, nome), pedido_itens(id, produto_id, quantidade, subtotal, produtos(nome))",
+      "id, cliente_id, status, data_entrega_prevista, data_entrega, total, created_at, clientes(id, nome), pedido_itens(id, produto_id, quantidade, subtotal, produtos(nome))",
     )
     .order("created_at", { ascending: false })
     .limit(10);
@@ -98,6 +99,12 @@ function formatarData(dataIso: string) {
     timeStyle: "short",
     timeZone: "America/Sao_Paulo",
   }).format(new Date(dataIso));
+}
+
+function formatarDataCurta(dataIso: string) {
+  const [ano, mes, dia] = dataIso.split("-");
+  if (!ano || !mes || !dia) return dataIso;
+  return `${dia}/${mes}/${ano}`;
 }
 
 function extrairNomeRelacao(
@@ -165,6 +172,7 @@ export default async function PedidosPage({ searchParams }: PageProps) {
               ? {
                   id: pedidoEdicao.id,
                   cliente_id: pedidoEdicao.cliente_id,
+                  data_entrega_prevista: pedidoEdicao.data_entrega_prevista,
                   itens: pedidoEdicao.pedido_itens.map((item) => ({
                     produto_id: item.produto_id,
                     quantidade: item.quantidade,
@@ -233,6 +241,11 @@ export default async function PedidosPage({ searchParams }: PageProps) {
                 <p className="mt-1 text-sm">
                   Total: <span className="font-semibold text-primary">{formatarMoeda(pedido.total)}</span>
                 </p>
+                {pedido.data_entrega_prevista ? (
+                  <p className="mt-1 text-xs text-foreground/70">
+                    Entrega prevista: {formatarDataCurta(pedido.data_entrega_prevista)}
+                  </p>
+                ) : null}
                 {pedido.data_entrega ? (
                   <p className="mt-1 text-xs text-foreground/70">
                     Entregue em: {formatarData(pedido.data_entrega)}
