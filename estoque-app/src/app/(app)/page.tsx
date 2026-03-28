@@ -1,5 +1,7 @@
 import { getSupabaseClient, hasSupabaseEnv } from "@/lib/supabase";
 
+export const dynamic = "force-dynamic";
+
 type PedidoResumo = {
   id: string;
   total: number;
@@ -137,7 +139,7 @@ export default async function DashboardPage() {
     <section className="space-y-6">
       <header>
         <p className="text-sm text-foreground/70">Visao geral</p>
-        <h1 className="text-2xl font-semibold">Dashboard</h1>
+        <h1 className="text-2xl font-semibold">Dona Leda Empadas</h1>
       </header>
 
       {!hasSupabaseEnv() ? (

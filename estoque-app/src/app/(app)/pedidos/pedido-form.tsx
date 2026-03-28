@@ -157,7 +157,7 @@ export function PedidoForm({
           return (
             <div
               key={`${index}-${item.produto_id}`}
-              className="grid gap-2 rounded-lg border border-black/10 p-3 md:grid-cols-[140px_1fr_120px_56px]"
+              className="grid gap-2 rounded-lg border border-black/10 p-3 md:grid-cols-[120px_minmax(140px,1fr)_180px_56px]"
             >
               <label className="flex flex-col gap-1 text-sm">
                 Sabor
@@ -206,19 +206,49 @@ export function PedidoForm({
 
               <label className="flex flex-col gap-1 text-sm">
                 Quantidade
-                <input
-                  type="number"
-                  min={1}
-                  step={1}
-                  value={item.quantidade}
-                  onChange={(event) =>
-                    atualizarItem(index, {
-                      ...item,
-                      quantidade: Number(event.target.value),
-                    })
-                  }
-                  className="rounded-lg border border-black/15 bg-white px-3 py-2 outline-none ring-primary/40 focus:ring"
-                />
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    min={1}
+                    step={1}
+                    value={item.quantidade}
+                    onChange={(event) =>
+                      atualizarItem(index, {
+                        ...item,
+                        quantidade: Math.max(1, Number(event.target.value || 1)),
+                      })
+                    }
+                    className="w-16 rounded-lg border border-black/15 bg-white px-2 py-2 text-center outline-none ring-primary/40 focus:ring"
+                  />
+                  <button
+                    type="button"
+                    onClick={() =>
+                      atualizarItem(index, {
+                        ...item,
+                        quantidade: Math.max(1, item.quantidade - 1),
+                      })
+                    }
+                    className="min-w-10 rounded-md border border-black/20 px-3 py-2 text-sm"
+                    aria-label="Diminuir quantidade"
+                    title="Diminuir quantidade"
+                  >
+                    -
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      atualizarItem(index, {
+                        ...item,
+                        quantidade: item.quantidade + 1,
+                      })
+                    }
+                    className="min-w-10 rounded-md border border-black/20 px-3 py-2 text-sm"
+                    aria-label="Aumentar quantidade"
+                    title="Aumentar quantidade"
+                  >
+                    +
+                  </button>
+                </div>
               </label>
 
               <div className="flex items-end">

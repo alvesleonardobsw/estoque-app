@@ -2,7 +2,8 @@
 
 import { useActionState } from "react";
 import Link from "next/link";
-import { salvarCliente } from "./actions";
+import { excluirCliente, salvarCliente } from "./actions";
+import { TrashIcon } from "@/components/action-icons";
 
 type ClienteEdicao = {
   id: string;
@@ -83,6 +84,28 @@ export function ClienteForm({
         >
           {isPending ? "Salvando..." : emEdicao ? "Salvar" : "Cadastrar cliente"}
         </button>
+
+        {emEdicao ? (
+          <form action={excluirCliente}>
+            <input type="hidden" name="id" value={clienteEdicao?.id ?? ""} />
+            <button
+              type="submit"
+              onClick={(event) => {
+                const confirmado = window.confirm("Tem certeza que deseja excluir este cliente?");
+                if (!confirmado) {
+                  event.preventDefault();
+                }
+              }}
+              className="rounded-lg border border-red-300 bg-red-50 px-4 py-2 text-sm font-medium text-red-700"
+              title="Excluir cliente"
+            >
+              <span className="flex items-center gap-2">
+                <TrashIcon />
+                Excluir
+              </span>
+            </button>
+          </form>
+        ) : null}
 
         {emEdicao || mostrarCancelarNovo ? (
           <Link

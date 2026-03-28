@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useEffect, useState } from "react";
 import Link from "next/link";
 import { excluirProduto, salvarProduto } from "./actions";
 import { TrashIcon } from "@/components/action-icons";
@@ -27,6 +27,11 @@ export function ProdutoForm({
 }) {
   const [state, formAction, isPending] = useActionState(salvarProduto, initialState);
   const emEdicao = Boolean(produtoEdicao);
+  const [estoqueAtual, setEstoqueAtual] = useState<number>(produtoEdicao?.estoque_atual ?? 0);
+
+  useEffect(() => {
+    setEstoqueAtual(produtoEdicao?.estoque_atual ?? 0);
+  }, [produtoEdicao?.id, produtoEdicao?.estoque_atual]);
 
   return (
     <form action={formAction} className="space-y-4 rounded-xl border border-black/10 bg-surface p-4">
@@ -78,16 +83,37 @@ export function ProdutoForm({
 
       <label className="flex flex-col gap-1 text-sm md:max-w-xs">
         {emEdicao ? "Estoque atual" : "Estoque inicial"}
-        <input
-          name="estoque_atual"
-          type="number"
-          required
-          min="0"
-          step="1"
-          defaultValue={produtoEdicao?.estoque_atual ?? ""}
-          className="rounded-lg border border-black/15 bg-white px-3 py-2 outline-none ring-primary/40 focus:ring"
-          placeholder="0"
-        />
+        <div className="flex items-center gap-2">
+          <input
+            name="estoque_atual"
+            type="number"
+            required
+            min="0"
+            step="1"
+            value={estoqueAtual}
+            onChange={(event) => setEstoqueAtual(Math.max(0, Number(event.target.value || 0)))}
+            className="w-20 rounded-lg border border-black/15 bg-white px-2 py-2 text-center outline-none ring-primary/40 focus:ring"
+            placeholder="0"
+          />
+          <button
+            type="button"
+            onClick={() => setEstoqueAtual((valor) => Math.max(0, valor - 1))}
+            className="min-w-10 rounded-md border border-black/20 px-3 py-2 text-sm"
+            aria-label="Diminuir estoque"
+            title="Diminuir estoque"
+          >
+            -
+          </button>
+          <button
+            type="button"
+            onClick={() => setEstoqueAtual((valor) => valor + 1)}
+            className="min-w-10 rounded-md border border-black/20 px-3 py-2 text-sm"
+            aria-label="Aumentar estoque"
+            title="Aumentar estoque"
+          >
+            +
+          </button>
+        </div>
       </label>
 
       {state.message ? (

@@ -1,7 +1,5 @@
 import { ClienteForm } from "./cliente-form";
 import { getSupabaseClient, hasSupabaseEnv } from "@/lib/supabase";
-import { excluirCliente } from "./actions";
-import { ConfirmDeleteButton } from "./confirm-delete-button";
 import Link from "next/link";
 import { EditIcon } from "@/components/action-icons";
 
@@ -118,11 +116,6 @@ export default async function ClientesPage({ searchParams }: PageProps) {
                       >
                         <EditIcon />
                       </Link>
-
-                      <form id={`excluir-cliente-${cliente.id}`} action={excluirCliente}>
-                        <input type="hidden" name="id" value={cliente.id} />
-                      </form>
-                      <ConfirmDeleteButton formId={`excluir-cliente-${cliente.id}`} />
                     </div>
                   </td>
                 </tr>
