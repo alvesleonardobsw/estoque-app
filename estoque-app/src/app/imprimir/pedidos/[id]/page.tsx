@@ -4,6 +4,7 @@ import { PrintControls } from "./print-controls";
 type PedidoDetalhe = {
   id: string;
   created_at: string;
+  data_entrega_prevista: string | null;
   data_entrega: string | null;
   total: number;
   clientes: { nome: string; endereco: string | null } | { nome: string; endereco: string | null }[] | null;
@@ -25,6 +26,12 @@ function formatarData(dataIso: string) {
     timeStyle: "short",
     timeZone: "America/Sao_Paulo",
   }).format(new Date(dataIso));
+}
+
+function formatarDataSomenteData(dataIso: string) {
+  const [ano, mes, dia] = dataIso.split("-");
+  if (!ano || !mes || !dia) return dataIso;
+  return `${dia}/${mes}/${ano}`;
 }
 
 function formatarMoeda(valor: number) {
@@ -67,7 +74,7 @@ export default async function ImprimirPedidoPage({ params }: PageProps) {
   const { data, error } = await supabase
     .from("pedidos")
     .select(
-      "id, created_at, data_entrega, total, clientes(nome, endereco), pedido_itens(id, quantidade, subtotal, produtos(nome))",
+      "id, created_at, data_entrega_prevista, data_entrega, total, clientes(nome, endereco), pedido_itens(id, quantidade, subtotal, produtos(nome))",
     )
     .eq("id", id)
     .single();
@@ -104,6 +111,11 @@ export default async function ImprimirPedidoPage({ params }: PageProps) {
         <p>
           <strong>Criado em:</strong> {formatarData(pedido.created_at)}
         </p>
+        {pedido.data_entrega_prevista ? (
+          <p>
+            <strong>Data de Entrega:</strong> {formatarDataSomenteData(pedido.data_entrega_prevista)}
+          </p>
+        ) : null}
         {pedido.data_entrega ? (
           <p>
             <strong>Entregue em:</strong> {formatarData(pedido.data_entrega)}
