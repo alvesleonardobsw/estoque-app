@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
+import { sair } from "@/app/login/actions";
 
 type NavItem = {
   href: string;
@@ -48,14 +49,30 @@ export function AppShell({ children }: { children: ReactNode }) {
         <aside className="hidden w-60 border-r border-black/10 bg-surface p-4 md:flex md:flex-col md:gap-2">
           <h1 className="mb-4 text-lg font-semibold text-primary">Estoque App</h1>
           <NavLinks />
+          <form action={sair} className="mt-auto pt-4">
+            <button
+              type="submit"
+              className="w-full rounded-lg border border-black/20 px-3 py-2 text-sm font-medium hover:bg-muted"
+            >
+              Sair
+            </button>
+          </form>
         </aside>
 
         <main className="flex-1 px-4 pb-24 pt-4 md:px-8 md:pb-8 md:pt-8">{children}</main>
       </div>
 
       <nav className="fixed inset-x-0 bottom-0 border-t border-black/10 bg-surface/95 p-2 backdrop-blur md:hidden">
-        <div className="mx-auto grid max-w-lg grid-cols-4 gap-1">
+        <div className="mx-auto grid max-w-lg grid-cols-5 gap-1">
           <NavLinks />
+          <form action={sair}>
+            <button
+              type="submit"
+              className="w-full rounded-lg px-3 py-2 text-sm font-medium text-foreground hover:bg-muted"
+            >
+              Sair
+            </button>
+          </form>
         </div>
       </nav>
     </div>
