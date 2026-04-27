@@ -1,4 +1,5 @@
 import { getSupabaseClient, hasSupabaseEnv } from "@/lib/supabase";
+import { requireSession } from "@/lib/auth";
 import { ProdutoForm } from "./produto-form";
 import Link from "next/link";
 import { EditIcon } from "@/components/action-icons";
@@ -11,7 +12,7 @@ type Produto = {
   estoque_atual: number;
 };
 
-async function listarProdutos() {
+async function listarProdutos(tenantId: string) {
   if (!hasSupabaseEnv()) {
     return { produtos: [] as Produto[], erro: "" };
   }
@@ -20,6 +21,7 @@ async function listarProdutos() {
   const { data, error } = await supabase
     .from("produtos")
     .select("id, nome, sabor, preco, estoque_atual")
+    .eq("tenant_id", tenantId)
     .eq("ativo", true)
     .order("created_at", { ascending: false });
 
@@ -84,6 +86,7 @@ function extrairPesoDoNome(nome: string) {
 }
 
 export default async function ProdutosPage({ searchParams }: PageProps) {
+  const sessao = await requireSession();
   const params = await searchParams;
   const editarId = typeof params.editar === "string" ? params.editar : "";
   const novo = typeof params.novo === "string" ? params.novo : "";
@@ -98,7 +101,7 @@ export default async function ProdutosPage({ searchParams }: PageProps) {
       ? (params.sabor as Sabor)
       : "";
   const pesoFiltro = typeof params.peso === "string" ? normalizarPeso(params.peso) : "";
-  const { produtos, erro } = await listarProdutos();
+  const { produtos, erro } = await listarProdutos(sessao.tenantId);
   const produtoEdicao = produtos.find((produto) => produto.id === editarId) ?? null;
   const mostrarFormulario = Boolean(produtoEdicao) || novo === "1";
   const produtosFiltrados = produtos.filter((produto) => {
@@ -126,8 +129,8 @@ export default async function ProdutosPage({ searchParams }: PageProps) {
 
       {!hasSupabaseEnv() ? (
         <article className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
-          Configure as variaveis `NEXT_PUBLIC_SUPABASE_URL` e
-          `NEXT_PUBLIC_SUPABASE_ANON_KEY` no arquivo `.env.local` para habilitar o
+          Configure as variaveis `SUPABASE_URL` e
+          `SUPABASE_SERVICE_ROLE_KEY` no arquivo `.env.local` para habilitar o
           cadastro de produtos.
         </article>
       ) : null}

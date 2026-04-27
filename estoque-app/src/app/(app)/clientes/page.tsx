@@ -1,5 +1,6 @@
 import { ClienteForm } from "./cliente-form";
 import { getSupabaseClient, hasSupabaseEnv } from "@/lib/supabase";
+import { requireSession } from "@/lib/auth";
 import Link from "next/link";
 import { EditIcon, MapPinIcon } from "@/components/action-icons";
 
@@ -10,7 +11,7 @@ type Cliente = {
   endereco: string | null;
 };
 
-async function listarClientes() {
+async function listarClientes(tenantId: string) {
   if (!hasSupabaseEnv()) {
     return { clientes: [] as Cliente[], erro: "" };
   }
@@ -19,6 +20,7 @@ async function listarClientes() {
   const { data, error } = await supabase
     .from("clientes")
     .select("id, nome, telefone, endereco")
+    .eq("tenant_id", tenantId)
     .order("created_at", { ascending: false });
 
   if (error) {
@@ -33,11 +35,12 @@ type PageProps = {
 };
 
 export default async function ClientesPage({ searchParams }: PageProps) {
+  const sessao = await requireSession();
   const params = await searchParams;
   const editarId = typeof params.editar === "string" ? params.editar : "";
   const erroAcao = typeof params.erro === "string" ? params.erro : "";
   const novo = typeof params.novo === "string" ? params.novo : "";
-  const { clientes, erro } = await listarClientes();
+  const { clientes, erro } = await listarClientes(sessao.tenantId);
   const clienteEdicao = clientes.find((cliente) => cliente.id === editarId) ?? null;
   const mostrarFormulario = Boolean(clienteEdicao) || novo === "1";
 
@@ -60,8 +63,8 @@ export default async function ClientesPage({ searchParams }: PageProps) {
 
       {!hasSupabaseEnv() ? (
         <article className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
-          Configure as variaveis `NEXT_PUBLIC_SUPABASE_URL` e
-          `NEXT_PUBLIC_SUPABASE_ANON_KEY` no arquivo `.env.local` para habilitar o
+          Configure as variaveis `SUPABASE_URL` e
+          `SUPABASE_SERVICE_ROLE_KEY` no arquivo `.env.local` para habilitar o
           cadastro de clientes.
         </article>
       ) : null}

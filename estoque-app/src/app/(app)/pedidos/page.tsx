@@ -1,4 +1,5 @@
 import { getSupabaseClient, hasSupabaseEnv } from "@/lib/supabase";
+import { requireSession } from "@/lib/auth";
 import { PedidoForm } from "./pedido-form";
 import { atualizarStatusPedido, excluirPedido } from "./actions";
 import Link from "next/link";
@@ -41,7 +42,7 @@ type PedidoLista = {
   }[];
 };
 
-async function carregarDadosPedidos(statusFiltro: "todos" | "pendente" | "entregue") {
+async function carregarDadosPedidos(tenantId: string, statusFiltro: "todos" | "pendente" | "entregue") {
   if (!hasSupabaseEnv()) {
     return {
       clientes: [] as Cliente[],
@@ -58,6 +59,7 @@ async function carregarDadosPedidos(statusFiltro: "todos" | "pendente" | "entreg
     .select(
       "id, cliente_id, status, data_entrega_prevista, data_entrega, total, created_at, clientes(id, nome), pedido_itens(id, produto_id, quantidade, subtotal, produtos(nome))",
     )
+    .eq("tenant_id", tenantId)
     .order("created_at", { ascending: false })
     .limit(10);
 
@@ -66,10 +68,11 @@ async function carregarDadosPedidos(statusFiltro: "todos" | "pendente" | "entreg
   }
 
   const [clientesResp, produtosResp, pedidosResp] = await Promise.all([
-    supabase.from("clientes").select("id, nome").order("nome", { ascending: true }),
+    supabase.from("clientes").select("id, nome").eq("tenant_id", tenantId).order("nome", { ascending: true }),
     supabase
       .from("produtos")
       .select("id, nome, sabor, preco, estoque_atual")
+      .eq("tenant_id", tenantId)
       .eq("ativo", true)
       .order("nome", { ascending: true }),
     pedidosQuery,
@@ -121,12 +124,13 @@ type PageProps = {
 };
 
 export default async function PedidosPage({ searchParams }: PageProps) {
+  const sessao = await requireSession();
   const params = await searchParams;
   const editarId = typeof params.editar === "string" ? params.editar : "";
   const novo = typeof params.novo === "string" ? params.novo : "";
   const statusFiltro =
     params.status === "pendente" || params.status === "entregue" ? params.status : "todos";
-  const { clientes, produtos, pedidos, erro } = await carregarDadosPedidos(statusFiltro);
+  const { clientes, produtos, pedidos, erro } = await carregarDadosPedidos(sessao.tenantId, statusFiltro);
   const pedidoEdicao = pedidos.find((pedido) => pedido.id === editarId);
   const mostrarFormulario = Boolean(pedidoEdicao) || novo === "1";
 
@@ -149,8 +153,8 @@ export default async function PedidosPage({ searchParams }: PageProps) {
 
       {!hasSupabaseEnv() ? (
         <article className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
-          Configure as variaveis `NEXT_PUBLIC_SUPABASE_URL` e
-          `NEXT_PUBLIC_SUPABASE_ANON_KEY` no arquivo `.env.local` para habilitar os
+          Configure as variaveis `SUPABASE_URL` e
+          `SUPABASE_SERVICE_ROLE_KEY` no arquivo `.env.local` para habilitar os
           pedidos.
         </article>
       ) : null}

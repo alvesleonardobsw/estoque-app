@@ -1,4 +1,5 @@
 import { getSupabaseClient, hasSupabaseEnv } from "@/lib/supabase";
+import { requireSession } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -54,7 +55,7 @@ function extrairNomeCliente(relacao: { nome: string } | { nome: string }[] | nul
   return relacao.nome ?? "Cliente nao encontrado";
 }
 
-async function carregarDashboard() {
+async function carregarDashboard(tenantId: string) {
   if (!hasSupabaseEnv()) {
     return {
       totalClientes: 0,
@@ -77,27 +78,35 @@ async function carregarDashboard() {
 
   const [clientesResp, produtosCountResp, produtosResp, pedidosHojeResp, pedidosMesResp, pedidosResp, pedidosPendentesResp] =
     await Promise.all([
-      supabase.from("clientes").select("id", { count: "exact", head: true }),
-      supabase.from("produtos").select("id", { count: "exact", head: true }).eq("ativo", true),
+      supabase.from("clientes").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId),
+      supabase.from("produtos").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId).eq("ativo", true),
       supabase
         .from("produtos")
         .select("id, nome, estoque_atual")
+        .eq("tenant_id", tenantId)
         .eq("ativo", true)
         .order("estoque_atual", { ascending: true }),
       supabase
         .from("pedidos")
         .select("id, total, created_at")
+        .eq("tenant_id", tenantId)
         .gte("created_at", inicioHoje.toISOString()),
       supabase
         .from("pedidos")
         .select("id, total, created_at")
+        .eq("tenant_id", tenantId)
         .gte("created_at", inicioMes.toISOString()),
       supabase
         .from("pedidos")
         .select("id, total, created_at, clientes(nome)")
+        .eq("tenant_id", tenantId)
         .order("created_at", { ascending: false })
         .limit(5),
-      supabase.from("pedidos").select("id", { count: "exact", head: true }).eq("status", "pendente"),
+      supabase
+        .from("pedidos")
+        .select("id", { count: "exact", head: true })
+        .eq("tenant_id", tenantId)
+        .eq("status", "pendente"),
     ]);
 
   const erro =
@@ -134,19 +143,20 @@ async function carregarDashboard() {
 }
 
 export default async function DashboardPage() {
-  const dados = await carregarDashboard();
+  const sessao = await requireSession();
+  const dados = await carregarDashboard(sessao.tenantId);
 
   return (
     <section className="space-y-6">
       <header>
         <p className="text-sm text-foreground/70">Visao geral</p>
-        <h1 className="text-2xl font-semibold">Dona Leda Empadas</h1>
+        <h1 className="text-2xl font-semibold">{sessao.appName}</h1>
       </header>
 
       {!hasSupabaseEnv() ? (
         <article className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
-          Configure as variaveis `NEXT_PUBLIC_SUPABASE_URL` e
-          `NEXT_PUBLIC_SUPABASE_ANON_KEY` no arquivo `.env.local`.
+          Configure as variaveis `SUPABASE_URL` e
+          `SUPABASE_SERVICE_ROLE_KEY` no arquivo `.env.local`.
         </article>
       ) : null}
 

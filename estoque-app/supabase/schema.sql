@@ -2,6 +2,7 @@ create extension if not exists pgcrypto;
 
 create table if not exists public.clientes (
   id uuid primary key default gen_random_uuid(),
+  tenant_id text not null default 'ledaempadas',
   nome text not null,
   telefone text,
   endereco text,
@@ -41,6 +42,7 @@ using (true);
 
 create table if not exists public.produtos (
   id uuid primary key default gen_random_uuid(),
+  tenant_id text not null default 'ledaempadas',
   nome text not null,
   sabor text not null default 'frango',
   preco numeric(10, 2) not null check (preco >= 0),
@@ -105,6 +107,7 @@ using (true);
 
 create table if not exists public.pedidos (
   id uuid primary key default gen_random_uuid(),
+  tenant_id text not null default 'ledaempadas',
   cliente_id uuid not null references public.clientes (id),
   status text not null default 'pendente' check (status in ('pendente', 'entregue')),
   data_entrega_prevista date,
@@ -124,6 +127,7 @@ alter table public.pedidos
 
 create table if not exists public.pedido_itens (
   id uuid primary key default gen_random_uuid(),
+  tenant_id text not null default 'ledaempadas',
   pedido_id uuid not null references public.pedidos (id) on delete cascade,
   produto_id uuid not null references public.produtos (id),
   quantidade integer not null check (quantidade > 0),
@@ -134,6 +138,7 @@ create table if not exists public.pedido_itens (
 
 create table if not exists public.estoque_movimentos (
   id uuid primary key default gen_random_uuid(),
+  tenant_id text not null default 'ledaempadas',
   produto_id uuid not null references public.produtos (id),
   pedido_id uuid references public.pedidos (id) on delete set null,
   tipo text not null check (tipo in ('entrada', 'saida')),
@@ -141,6 +146,76 @@ create table if not exists public.estoque_movimentos (
   observacao text,
   created_at timestamptz not null default now()
 );
+
+alter table public.clientes
+  add column if not exists tenant_id text;
+
+update public.clientes
+set tenant_id = 'ledaempadas'
+where tenant_id is null or btrim(tenant_id) = '';
+
+alter table public.clientes
+  alter column tenant_id set not null;
+
+alter table public.produtos
+  add column if not exists tenant_id text;
+
+update public.produtos
+set tenant_id = 'ledaempadas'
+where tenant_id is null or btrim(tenant_id) = '';
+
+alter table public.produtos
+  alter column tenant_id set not null;
+
+alter table public.pedidos
+  add column if not exists tenant_id text;
+
+update public.pedidos
+set tenant_id = 'ledaempadas'
+where tenant_id is null or btrim(tenant_id) = '';
+
+alter table public.pedidos
+  alter column tenant_id set not null;
+
+alter table public.pedido_itens
+  add column if not exists tenant_id text;
+
+update public.pedido_itens pi
+set tenant_id = p.tenant_id
+from public.pedidos p
+where pi.pedido_id = p.id
+  and (pi.tenant_id is null or btrim(pi.tenant_id) = '');
+
+update public.pedido_itens
+set tenant_id = 'ledaempadas'
+where tenant_id is null or btrim(tenant_id) = '';
+
+alter table public.pedido_itens
+  alter column tenant_id set not null;
+
+alter table public.estoque_movimentos
+  add column if not exists tenant_id text;
+
+update public.estoque_movimentos em
+set tenant_id = coalesce(
+  (select p.tenant_id from public.pedidos p where p.id = em.pedido_id),
+  (select pr.tenant_id from public.produtos pr where pr.id = em.produto_id),
+  'ledaempadas'
+)
+where em.tenant_id is null or btrim(em.tenant_id) = '';
+
+update public.estoque_movimentos
+set tenant_id = 'ledaempadas'
+where tenant_id is null or btrim(tenant_id) = '';
+
+alter table public.estoque_movimentos
+  alter column tenant_id set not null;
+
+create index if not exists idx_clientes_tenant_id on public.clientes (tenant_id);
+create index if not exists idx_produtos_tenant_id on public.produtos (tenant_id);
+create index if not exists idx_pedidos_tenant_id on public.pedidos (tenant_id);
+create index if not exists idx_pedido_itens_tenant_id on public.pedido_itens (tenant_id);
+create index if not exists idx_estoque_movimentos_tenant_id on public.estoque_movimentos (tenant_id);
 
 alter table public.pedidos enable row level security;
 alter table public.pedido_itens enable row level security;
@@ -167,7 +242,9 @@ for select
 to anon
 using (true);
 
-create or replace function public.registrar_pedido(p_cliente_id uuid, p_itens jsonb)
+drop function if exists public.registrar_pedido(uuid, jsonb);
+
+create or replace function public.registrar_pedido(p_tenant_id text, p_cliente_id uuid, p_itens jsonb)
 returns uuid
 language plpgsql
 security definer
@@ -182,6 +259,10 @@ declare
   v_estoque integer;
   v_total numeric(12, 2) := 0;
 begin
+  if p_tenant_id is null or btrim(p_tenant_id) = '' then
+    raise exception 'Tenant invalido.';
+  end if;
+
   if p_cliente_id is null then
     raise exception 'Cliente invalido.';
   end if;
@@ -192,8 +273,17 @@ begin
     raise exception 'Informe ao menos um item no pedido.';
   end if;
 
-  insert into public.pedidos (cliente_id, total)
-  values (p_cliente_id, 0)
+  perform 1
+  from public.clientes
+  where id = p_cliente_id
+    and tenant_id = p_tenant_id;
+
+  if not found then
+    raise exception 'Cliente nao encontrado para esta conta.';
+  end if;
+
+  insert into public.pedidos (tenant_id, cliente_id, total)
+  values (p_tenant_id, p_cliente_id, 0)
   returning id into v_pedido_id;
 
   for v_item in
@@ -210,6 +300,7 @@ begin
     into v_preco, v_estoque
     from public.produtos
     where id = v_produto_id
+      and tenant_id = p_tenant_id
     for update;
 
     if not found then
@@ -222,10 +313,12 @@ begin
 
     update public.produtos
     set estoque_atual = estoque_atual - v_quantidade
-    where id = v_produto_id;
+    where id = v_produto_id
+      and tenant_id = p_tenant_id;
 
     insert into public.pedido_itens (
       pedido_id,
+      tenant_id,
       produto_id,
       quantidade,
       preco_unitario,
@@ -233,6 +326,7 @@ begin
     )
     values (
       v_pedido_id,
+      p_tenant_id,
       v_produto_id,
       v_quantidade,
       v_preco,
@@ -242,6 +336,7 @@ begin
     insert into public.estoque_movimentos (
       produto_id,
       pedido_id,
+      tenant_id,
       tipo,
       quantidade,
       observacao
@@ -249,6 +344,7 @@ begin
     values (
       v_produto_id,
       v_pedido_id,
+      p_tenant_id,
       'saida',
       v_quantidade,
       'Baixa automatica por pedido'
@@ -259,15 +355,23 @@ begin
 
   update public.pedidos
   set total = v_total
-  where id = v_pedido_id;
+  where id = v_pedido_id
+    and tenant_id = p_tenant_id;
 
   return v_pedido_id;
 end;
 $$;
 
-grant execute on function public.registrar_pedido(uuid, jsonb) to anon;
+grant execute on function public.registrar_pedido(text, uuid, jsonb) to anon;
 
-create or replace function public.atualizar_pedido(p_pedido_id uuid, p_cliente_id uuid, p_itens jsonb)
+drop function if exists public.atualizar_pedido(uuid, uuid, jsonb);
+
+create or replace function public.atualizar_pedido(
+  p_tenant_id text,
+  p_pedido_id uuid,
+  p_cliente_id uuid,
+  p_itens jsonb
+)
 returns uuid
 language plpgsql
 security definer
@@ -282,6 +386,10 @@ declare
   v_total numeric(12, 2) := 0;
   v_item_antigo record;
 begin
+  if p_tenant_id is null or btrim(p_tenant_id) = '' then
+    raise exception 'Tenant invalido.';
+  end if;
+
   if p_pedido_id is null then
     raise exception 'Pedido invalido.';
   end if;
@@ -297,8 +405,18 @@ begin
   end if;
 
   perform 1
+  from public.clientes
+  where id = p_cliente_id
+    and tenant_id = p_tenant_id;
+
+  if not found then
+    raise exception 'Cliente nao encontrado para esta conta.';
+  end if;
+
+  perform 1
   from public.pedidos
   where id = p_pedido_id
+    and tenant_id = p_tenant_id
   for update;
 
   if not found then
@@ -309,14 +427,17 @@ begin
     select produto_id, quantidade
     from public.pedido_itens
     where pedido_id = p_pedido_id
+      and tenant_id = p_tenant_id
   loop
     update public.produtos
     set estoque_atual = estoque_atual + v_item_antigo.quantidade
-    where id = v_item_antigo.produto_id;
+    where id = v_item_antigo.produto_id
+      and tenant_id = p_tenant_id;
 
     insert into public.estoque_movimentos (
       produto_id,
       pedido_id,
+      tenant_id,
       tipo,
       quantidade,
       observacao
@@ -324,13 +445,16 @@ begin
     values (
       v_item_antigo.produto_id,
       p_pedido_id,
+      p_tenant_id,
       'entrada',
       v_item_antigo.quantidade,
       'Devolucao por alteracao de pedido'
     );
   end loop;
 
-  delete from public.pedido_itens where pedido_id = p_pedido_id;
+  delete from public.pedido_itens
+  where pedido_id = p_pedido_id
+    and tenant_id = p_tenant_id;
 
   for v_item in
     select value from jsonb_array_elements(p_itens)
@@ -346,6 +470,7 @@ begin
     into v_preco, v_estoque
     from public.produtos
     where id = v_produto_id
+      and tenant_id = p_tenant_id
     for update;
 
     if not found then
@@ -358,10 +483,12 @@ begin
 
     update public.produtos
     set estoque_atual = estoque_atual - v_quantidade
-    where id = v_produto_id;
+    where id = v_produto_id
+      and tenant_id = p_tenant_id;
 
     insert into public.pedido_itens (
       pedido_id,
+      tenant_id,
       produto_id,
       quantidade,
       preco_unitario,
@@ -369,6 +496,7 @@ begin
     )
     values (
       p_pedido_id,
+      p_tenant_id,
       v_produto_id,
       v_quantidade,
       v_preco,
@@ -378,6 +506,7 @@ begin
     insert into public.estoque_movimentos (
       produto_id,
       pedido_id,
+      tenant_id,
       tipo,
       quantidade,
       observacao
@@ -385,6 +514,7 @@ begin
     values (
       v_produto_id,
       p_pedido_id,
+      p_tenant_id,
       'saida',
       v_quantidade,
       'Baixa por alteracao de pedido'
@@ -396,15 +526,18 @@ begin
   update public.pedidos
   set cliente_id = p_cliente_id,
       total = v_total
-  where id = p_pedido_id;
+  where id = p_pedido_id
+    and tenant_id = p_tenant_id;
 
   return p_pedido_id;
 end;
 $$;
 
-grant execute on function public.atualizar_pedido(uuid, uuid, jsonb) to anon;
+grant execute on function public.atualizar_pedido(text, uuid, uuid, jsonb) to anon;
 
-create or replace function public.excluir_pedido(p_pedido_id uuid)
+drop function if exists public.excluir_pedido(uuid);
+
+create or replace function public.excluir_pedido(p_tenant_id text, p_pedido_id uuid)
 returns boolean
 language plpgsql
 security definer
@@ -413,6 +546,10 @@ as $$
 declare
   v_item record;
 begin
+  if p_tenant_id is null or btrim(p_tenant_id) = '' then
+    raise exception 'Tenant invalido.';
+  end if;
+
   if p_pedido_id is null then
     raise exception 'Pedido invalido.';
   end if;
@@ -420,6 +557,7 @@ begin
   perform 1
   from public.pedidos
   where id = p_pedido_id
+    and tenant_id = p_tenant_id
   for update;
 
   if not found then
@@ -430,14 +568,17 @@ begin
     select produto_id, quantidade
     from public.pedido_itens
     where pedido_id = p_pedido_id
+      and tenant_id = p_tenant_id
   loop
     update public.produtos
     set estoque_atual = estoque_atual + v_item.quantidade
-    where id = v_item.produto_id;
+    where id = v_item.produto_id
+      and tenant_id = p_tenant_id;
 
     insert into public.estoque_movimentos (
       produto_id,
       pedido_id,
+      tenant_id,
       tipo,
       quantidade,
       observacao
@@ -445,21 +586,27 @@ begin
     values (
       v_item.produto_id,
       p_pedido_id,
+      p_tenant_id,
       'entrada',
       v_item.quantidade,
       'Devolucao por exclusao de pedido'
     );
   end loop;
 
-  delete from public.pedidos where id = p_pedido_id;
+  delete from public.pedidos
+  where id = p_pedido_id
+    and tenant_id = p_tenant_id;
 
   return true;
 end;
 $$;
 
-grant execute on function public.excluir_pedido(uuid) to anon;
+grant execute on function public.excluir_pedido(text, uuid) to anon;
+
+drop function if exists public.atualizar_data_entrega_prevista_pedido(uuid, date);
 
 create or replace function public.atualizar_data_entrega_prevista_pedido(
+  p_tenant_id text,
   p_pedido_id uuid,
   p_data_entrega_prevista date
 )
@@ -469,13 +616,18 @@ security definer
 set search_path = public
 as $$
 begin
+  if p_tenant_id is null or btrim(p_tenant_id) = '' then
+    raise exception 'Tenant invalido.';
+  end if;
+
   if p_pedido_id is null then
     raise exception 'Pedido invalido.';
   end if;
 
   update public.pedidos
   set data_entrega_prevista = p_data_entrega_prevista
-  where id = p_pedido_id;
+  where id = p_pedido_id
+    and tenant_id = p_tenant_id;
 
   if not found then
     raise exception 'Pedido nao encontrado.';
@@ -485,15 +637,25 @@ begin
 end;
 $$;
 
-grant execute on function public.atualizar_data_entrega_prevista_pedido(uuid, date) to anon;
+grant execute on function public.atualizar_data_entrega_prevista_pedido(text, uuid, date) to anon;
 
-create or replace function public.atualizar_status_pedido(p_pedido_id uuid, p_status text)
+drop function if exists public.atualizar_status_pedido(uuid, text);
+
+create or replace function public.atualizar_status_pedido(
+  p_tenant_id text,
+  p_pedido_id uuid,
+  p_status text
+)
 returns uuid
 language plpgsql
 security definer
 set search_path = public
 as $$
 begin
+  if p_tenant_id is null or btrim(p_tenant_id) = '' then
+    raise exception 'Tenant invalido.';
+  end if;
+
   if p_pedido_id is null then
     raise exception 'Pedido invalido.';
   end if;
@@ -509,7 +671,8 @@ begin
       when p_status = 'entregue' then now()
       else null
     end
-  where id = p_pedido_id;
+  where id = p_pedido_id
+    and tenant_id = p_tenant_id;
 
   if not found then
     raise exception 'Pedido nao encontrado.';
@@ -519,4 +682,4 @@ begin
 end;
 $$;
 
-grant execute on function public.atualizar_status_pedido(uuid, text) to anon;
+grant execute on function public.atualizar_status_pedido(text, uuid, text) to anon;

@@ -1,4 +1,5 @@
 import { getSupabaseClient, hasSupabaseEnv } from "@/lib/supabase";
+import { requireSession } from "@/lib/auth";
 import { PrintControls } from "./print-controls";
 
 type PedidoDetalhe = {
@@ -65,6 +66,7 @@ function extrairEnderecoRelacao(
 
 export default async function ImprimirPedidoPage({ params }: PageProps) {
   const { id } = await params;
+  const sessao = await requireSession();
 
   if (!hasSupabaseEnv()) {
     return <main className="p-4">Supabase nao configurado.</main>;
@@ -76,6 +78,7 @@ export default async function ImprimirPedidoPage({ params }: PageProps) {
     .select(
       "id, created_at, data_entrega_prevista, data_entrega, total, clientes(nome, endereco), pedido_itens(id, quantidade, subtotal, produtos(nome))",
     )
+    .eq("tenant_id", sessao.tenantId)
     .eq("id", id)
     .single();
 

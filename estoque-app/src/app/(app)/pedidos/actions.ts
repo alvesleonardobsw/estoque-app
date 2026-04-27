@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { requireSession } from "@/lib/auth";
 import { getSupabaseClient, hasSupabaseEnv } from "@/lib/supabase";
 
 type ActionState = {
@@ -19,6 +20,7 @@ export async function salvarPedido(_: ActionState, formData: FormData): Promise<
     return { ok: false, message: "Configure o Supabase antes de criar pedidos." };
   }
 
+  const sessao = await requireSession();
   const pedidoId = String(formData.get("pedido_id") ?? "").trim();
   const clienteId = String(formData.get("cliente_id") ?? "").trim();
   const dataEntregaPrevistaRaw = String(formData.get("data_entrega_prevista") ?? "").trim();
@@ -57,11 +59,13 @@ export async function salvarPedido(_: ActionState, formData: FormData): Promise<
   const supabase = getSupabaseClient();
   const { data, error } = pedidoId
     ? await supabase.rpc("atualizar_pedido", {
+        p_tenant_id: sessao.tenantId,
         p_pedido_id: pedidoId,
         p_cliente_id: clienteId,
         p_itens: itens,
       })
     : await supabase.rpc("registrar_pedido", {
+        p_tenant_id: sessao.tenantId,
         p_cliente_id: clienteId,
         p_itens: itens,
       });
@@ -73,6 +77,7 @@ export async function salvarPedido(_: ActionState, formData: FormData): Promise<
   const pedidoPersistidoId = pedidoId || (typeof data === "string" ? data : "");
   if (pedidoPersistidoId) {
     const { error: erroDataEntrega } = await supabase.rpc("atualizar_data_entrega_prevista_pedido", {
+      p_tenant_id: sessao.tenantId,
       p_pedido_id: pedidoPersistidoId,
       p_data_entrega_prevista: dataEntregaPrevistaRaw || null,
     });
@@ -98,12 +103,14 @@ export async function salvarPedido(_: ActionState, formData: FormData): Promise<
 
 export async function excluirPedido(formData: FormData) {
   if (!hasSupabaseEnv()) return;
+  const sessao = await requireSession();
 
   const pedidoId = String(formData.get("pedido_id") ?? "").trim();
   if (!pedidoId) return;
 
   const supabase = getSupabaseClient();
   await supabase.rpc("excluir_pedido", {
+    p_tenant_id: sessao.tenantId,
     p_pedido_id: pedidoId,
   });
 
@@ -114,6 +121,7 @@ export async function excluirPedido(formData: FormData) {
 
 export async function atualizarStatusPedido(formData: FormData) {
   if (!hasSupabaseEnv()) return;
+  const sessao = await requireSession();
 
   const pedidoId = String(formData.get("pedido_id") ?? "").trim();
   const status = String(formData.get("status") ?? "").trim();
@@ -122,6 +130,7 @@ export async function atualizarStatusPedido(formData: FormData) {
 
   const supabase = getSupabaseClient();
   await supabase.rpc("atualizar_status_pedido", {
+    p_tenant_id: sessao.tenantId,
     p_pedido_id: pedidoId,
     p_status: status,
   });

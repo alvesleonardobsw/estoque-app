@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { requireSession } from "@/lib/auth";
 import { getSupabaseClient, hasSupabaseEnv } from "@/lib/supabase";
 
 type ActionState = {
@@ -14,6 +15,7 @@ export async function salvarCliente(_: ActionState, formData: FormData): Promise
     return { ok: false, message: "Configure o Supabase antes de cadastrar clientes." };
   }
 
+  const sessao = await requireSession();
   const id = String(formData.get("id") ?? "").trim();
   const nome = String(formData.get("nome") ?? "").trim();
   const telefone = String(formData.get("telefone") ?? "").trim();
@@ -34,7 +36,9 @@ export async function salvarCliente(_: ActionState, formData: FormData): Promise
           endereco,
         })
         .eq("id", id)
+        .eq("tenant_id", sessao.tenantId)
     : await supabase.from("clientes").insert({
+        tenant_id: sessao.tenantId,
         nome,
         telefone,
         endereco,
@@ -61,13 +65,18 @@ export async function excluirCliente(formData: FormData) {
     redirect("/clientes?erro=config");
   }
 
+  const sessao = await requireSession();
   const id = String(formData.get("id") ?? "").trim();
   if (!id) {
     redirect("/clientes?erro=exclusao");
   }
 
   const supabase = getSupabaseClient();
-  const { error } = await supabase.from("clientes").delete().eq("id", id);
+  const { error } = await supabase
+    .from("clientes")
+    .delete()
+    .eq("id", id)
+    .eq("tenant_id", sessao.tenantId);
 
   if (error) {
     if (error.code === "23503") {
