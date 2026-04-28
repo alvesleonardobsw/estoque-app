@@ -15,6 +15,7 @@ const navItems: NavItem[] = [
   { href: "/clientes", label: "Clientes" },
   { href: "/produtos", label: "Produtos" },
   { href: "/pedidos", label: "Pedidos" },
+  { href: "/precificacao", label: "Precificacao" },
 ];
 
 function NavLinks() {
@@ -63,7 +64,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       </div>
 
       <nav className="fixed inset-x-0 bottom-0 border-t border-black/10 bg-surface/95 p-2 backdrop-blur md:hidden">
-        <div className="mx-auto grid max-w-lg grid-cols-5 gap-1">
+        <div className="mx-auto grid max-w-lg grid-cols-6 gap-1">
           <NavLinks />
           <form action={sair}>
             <button

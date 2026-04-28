@@ -683,3 +683,388 @@ end;
 $$;
 
 grant execute on function public.atualizar_status_pedido(text, uuid, text) to anon;
+
+create table if not exists public.precificacao_produtos (
+  id uuid primary key default gen_random_uuid(),
+  tenant_id text not null default 'ledaempadas',
+  nome text not null,
+  preco_venda numeric(10, 2),
+  created_at timestamptz not null default now()
+);
+
+create table if not exists public.precificacao_ingredientes (
+  id uuid primary key default gen_random_uuid(),
+  tenant_id text not null default 'ledaempadas',
+  produto_id uuid not null references public.precificacao_produtos (id) on delete cascade,
+  tipo text not null default 'ingrediente',
+  nome text not null,
+  quantidade text not null,
+  custo numeric(10, 2) not null check (custo >= 0),
+  created_at timestamptz not null default now()
+);
+
+create table if not exists public.precificacao_custos_base (
+  id uuid primary key default gen_random_uuid(),
+  tenant_id text not null default 'ledaempadas',
+  tipo text not null default 'ingrediente',
+  nome text not null,
+  unidade_padrao text,
+  custo_padrao numeric(10, 2) not null check (custo_padrao >= 0),
+  created_at timestamptz not null default now()
+);
+
+alter table public.precificacao_produtos
+  add column if not exists tenant_id text;
+
+update public.precificacao_produtos
+set tenant_id = 'ledaempadas'
+where tenant_id is null or btrim(tenant_id) = '';
+
+alter table public.precificacao_produtos
+  alter column tenant_id set not null;
+
+alter table public.precificacao_ingredientes
+  add column if not exists tenant_id text;
+
+alter table public.precificacao_ingredientes
+  add column if not exists tipo text;
+
+update public.precificacao_ingredientes pi
+set tenant_id = pp.tenant_id
+from public.precificacao_produtos pp
+where pi.produto_id = pp.id
+  and (pi.tenant_id is null or btrim(pi.tenant_id) = '');
+
+update public.precificacao_ingredientes
+set tenant_id = 'ledaempadas'
+where tenant_id is null or btrim(tenant_id) = '';
+
+update public.precificacao_ingredientes
+set tipo = 'ingrediente'
+where tipo is null or btrim(tipo) = '';
+
+alter table public.precificacao_ingredientes
+  alter column tenant_id set not null;
+
+alter table public.precificacao_ingredientes
+  alter column tipo set not null;
+
+alter table public.precificacao_ingredientes
+  alter column tipo set default 'ingrediente';
+
+alter table public.precificacao_ingredientes
+  drop constraint if exists precificacao_ingredientes_tipo_check;
+
+alter table public.precificacao_ingredientes
+  add constraint precificacao_ingredientes_tipo_check
+  check (tipo in ('ingrediente', 'embalagem', 'gas', 'energia', 'mao_obra', 'outro'));
+
+alter table public.precificacao_custos_base
+  add column if not exists tenant_id text;
+
+alter table public.precificacao_custos_base
+  add column if not exists tipo text;
+
+alter table public.precificacao_custos_base
+  add column if not exists unidade_padrao text;
+
+alter table public.precificacao_custos_base
+  add column if not exists custo_padrao numeric(10, 2);
+
+update public.precificacao_custos_base
+set tenant_id = 'ledaempadas'
+where tenant_id is null or btrim(tenant_id) = '';
+
+update public.precificacao_custos_base
+set tipo = 'ingrediente'
+where tipo is null or btrim(tipo) = '';
+
+update public.precificacao_custos_base
+set custo_padrao = 0
+where custo_padrao is null;
+
+alter table public.precificacao_custos_base
+  alter column tenant_id set not null;
+
+alter table public.precificacao_custos_base
+  alter column tipo set not null;
+
+alter table public.precificacao_custos_base
+  alter column tipo set default 'ingrediente';
+
+alter table public.precificacao_custos_base
+  alter column custo_padrao set not null;
+
+alter table public.precificacao_custos_base
+  drop constraint if exists precificacao_custos_base_tipo_check;
+
+alter table public.precificacao_custos_base
+  add constraint precificacao_custos_base_tipo_check
+  check (tipo in ('ingrediente', 'embalagem', 'gas', 'energia', 'mao_obra', 'outro'));
+
+alter table public.precificacao_custos_base
+  drop constraint if exists precificacao_custos_base_custo_padrao_check;
+
+alter table public.precificacao_custos_base
+  add constraint precificacao_custos_base_custo_padrao_check
+  check (custo_padrao >= 0);
+
+create index if not exists idx_precificacao_produtos_tenant_id
+  on public.precificacao_produtos (tenant_id);
+create index if not exists idx_precificacao_ingredientes_tenant_id
+  on public.precificacao_ingredientes (tenant_id);
+create index if not exists idx_precificacao_ingredientes_produto_id
+  on public.precificacao_ingredientes (produto_id);
+create index if not exists idx_precificacao_custos_base_tenant_id
+  on public.precificacao_custos_base (tenant_id);
+
+alter table public.precificacao_produtos enable row level security;
+alter table public.precificacao_ingredientes enable row level security;
+alter table public.precificacao_custos_base enable row level security;
+
+drop policy if exists "Permitir leitura de precificacao_produtos" on public.precificacao_produtos;
+create policy "Permitir leitura de precificacao_produtos"
+on public.precificacao_produtos
+for select
+to anon
+using (true);
+
+drop policy if exists "Permitir leitura de precificacao_ingredientes" on public.precificacao_ingredientes;
+create policy "Permitir leitura de precificacao_ingredientes"
+on public.precificacao_ingredientes
+for select
+to anon
+using (true);
+
+drop policy if exists "Permitir leitura de precificacao_custos_base" on public.precificacao_custos_base;
+create policy "Permitir leitura de precificacao_custos_base"
+on public.precificacao_custos_base
+for select
+to anon
+using (true);
+
+drop function if exists public.salvar_produto_precificacao(text, uuid, text, numeric, jsonb);
+
+create or replace function public.salvar_produto_precificacao(
+  p_tenant_id text,
+  p_produto_id uuid,
+  p_nome text,
+  p_preco_venda numeric,
+  p_ingredientes jsonb
+)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_produto_id uuid;
+  v_item jsonb;
+  v_tipo text;
+  v_nome text;
+  v_quantidade text;
+  v_custo numeric(10, 2);
+begin
+  if p_tenant_id is null or btrim(p_tenant_id) = '' then
+    raise exception 'Tenant invalido.';
+  end if;
+
+  if p_nome is null or btrim(p_nome) = '' then
+    raise exception 'Nome do produto e obrigatorio.';
+  end if;
+
+  if p_preco_venda is not null and p_preco_venda < 0 then
+    raise exception 'Preco de venda invalido.';
+  end if;
+
+  if p_ingredientes is null
+    or jsonb_typeof(p_ingredientes) <> 'array'
+    or jsonb_array_length(p_ingredientes) = 0 then
+    raise exception 'Informe ao menos um ingrediente.';
+  end if;
+
+  if p_produto_id is null then
+    insert into public.precificacao_produtos (tenant_id, nome, preco_venda)
+    values (p_tenant_id, btrim(p_nome), p_preco_venda)
+    returning id into v_produto_id;
+  else
+    update public.precificacao_produtos
+    set nome = btrim(p_nome),
+        preco_venda = p_preco_venda
+    where id = p_produto_id
+      and tenant_id = p_tenant_id
+    returning id into v_produto_id;
+
+    if v_produto_id is null then
+      raise exception 'Produto de precificacao nao encontrado.';
+    end if;
+
+    delete from public.precificacao_ingredientes
+    where produto_id = v_produto_id
+      and tenant_id = p_tenant_id;
+  end if;
+
+  for v_item in
+    select value from jsonb_array_elements(p_ingredientes)
+  loop
+    v_tipo := btrim(lower(coalesce(v_item ->> 'tipo', 'ingrediente')));
+    v_nome := btrim(coalesce(v_item ->> 'nome', ''));
+    v_quantidade := btrim(coalesce(v_item ->> 'quantidade', ''));
+    v_custo := nullif(v_item ->> 'custo', '')::numeric(10, 2);
+
+    if v_tipo not in ('ingrediente', 'embalagem', 'gas', 'energia', 'mao_obra', 'outro') then
+      raise exception 'Tipo de custo invalido.';
+    end if;
+
+    if v_nome = '' or v_quantidade = '' or v_custo is null or v_custo < 0 then
+      raise exception 'Ingrediente invalido.';
+    end if;
+
+    insert into public.precificacao_ingredientes (
+      tenant_id,
+      produto_id,
+      tipo,
+      nome,
+      quantidade,
+      custo
+    )
+    values (
+      p_tenant_id,
+      v_produto_id,
+      v_tipo,
+      v_nome,
+      v_quantidade,
+      v_custo
+    );
+  end loop;
+
+  return v_produto_id;
+end;
+$$;
+
+grant execute on function public.salvar_produto_precificacao(text, uuid, text, numeric, jsonb) to anon;
+
+drop function if exists public.salvar_custo_base_precificacao(text, text, text, text, numeric);
+
+create or replace function public.salvar_custo_base_precificacao(
+  p_tenant_id text,
+  p_tipo text,
+  p_nome text,
+  p_unidade_padrao text,
+  p_custo_padrao numeric
+)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_id uuid;
+  v_tipo text;
+begin
+  if p_tenant_id is null or btrim(p_tenant_id) = '' then
+    raise exception 'Tenant invalido.';
+  end if;
+
+  v_tipo := btrim(lower(coalesce(p_tipo, 'ingrediente')));
+  if v_tipo not in ('ingrediente', 'embalagem', 'gas', 'energia', 'mao_obra', 'outro') then
+    raise exception 'Tipo invalido.';
+  end if;
+
+  if p_nome is null or btrim(p_nome) = '' then
+    raise exception 'Nome obrigatorio.';
+  end if;
+
+  if p_custo_padrao is null or p_custo_padrao < 0 then
+    raise exception 'Custo padrao invalido.';
+  end if;
+
+  insert into public.precificacao_custos_base (
+    tenant_id,
+    tipo,
+    nome,
+    unidade_padrao,
+    custo_padrao
+  )
+  values (
+    p_tenant_id,
+    v_tipo,
+    btrim(p_nome),
+    nullif(btrim(coalesce(p_unidade_padrao, '')), ''),
+    p_custo_padrao
+  )
+  returning id into v_id;
+
+  return v_id;
+end;
+$$;
+
+grant execute on function public.salvar_custo_base_precificacao(text, text, text, text, numeric) to anon;
+
+drop function if exists public.excluir_custo_base_precificacao(text, uuid);
+
+create or replace function public.excluir_custo_base_precificacao(
+  p_tenant_id text,
+  p_custo_base_id uuid
+)
+returns boolean
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if p_tenant_id is null or btrim(p_tenant_id) = '' then
+    raise exception 'Tenant invalido.';
+  end if;
+
+  if p_custo_base_id is null then
+    raise exception 'Ingrediente invalido.';
+  end if;
+
+  delete from public.precificacao_custos_base
+  where id = p_custo_base_id
+    and tenant_id = p_tenant_id;
+
+  if not found then
+    return false;
+  end if;
+
+  return true;
+end;
+$$;
+
+grant execute on function public.excluir_custo_base_precificacao(text, uuid) to anon;
+
+drop function if exists public.excluir_produto_precificacao(text, uuid);
+
+create or replace function public.excluir_produto_precificacao(
+  p_tenant_id text,
+  p_produto_id uuid
+)
+returns boolean
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if p_tenant_id is null or btrim(p_tenant_id) = '' then
+    raise exception 'Tenant invalido.';
+  end if;
+
+  if p_produto_id is null then
+    raise exception 'Produto invalido.';
+  end if;
+
+  delete from public.precificacao_produtos
+  where id = p_produto_id
+    and tenant_id = p_tenant_id;
+
+  if not found then
+    return false;
+  end if;
+
+  return true;
+end;
+$$;
+
+grant execute on function public.excluir_produto_precificacao(text, uuid) to anon;
