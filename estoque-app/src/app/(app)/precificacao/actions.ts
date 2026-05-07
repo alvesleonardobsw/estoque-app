@@ -11,6 +11,7 @@ type ActionState = {
 };
 
 type IngredienteInput = {
+  tipo: "ingrediente" | "embalagem" | "gas" | "energia" | "mao_obra" | "outro";
   nome: string;
   quantidade: string;
   custo: number;
@@ -31,6 +32,7 @@ export async function salvarProdutoPrecificacao(
     .trim()
     .replace(",", ".");
   const ingredientesBrutos = String(formData.get("ingredientes") ?? "[]");
+  const outrosCustosBrutos = String(formData.get("outros_custos") ?? "[]");
 
   if (!nome) {
     return { ok: false, message: "Informe o nome do produto." };
@@ -44,6 +46,7 @@ export async function salvarProdutoPrecificacao(
   }
 
   let ingredientes: IngredienteInput[] = [];
+  let outrosCustos: IngredienteInput[] = [];
 
   try {
     const parsed = JSON.parse(ingredientesBrutos);
@@ -53,6 +56,7 @@ export async function salvarProdutoPrecificacao(
 
     ingredientes = parsed
       .map((item) => ({
+        tipo: "ingrediente" as const,
         nome: String(item?.nome ?? "").trim(),
         quantidade: String(item?.quantidade ?? "").trim(),
         custo: Number(item?.custo ?? 0),
@@ -72,13 +76,37 @@ export async function salvarProdutoPrecificacao(
     return { ok: false, message: "Adicione pelo menos um ingrediente valido." };
   }
 
+  try {
+    const parsed = JSON.parse(outrosCustosBrutos);
+    if (Array.isArray(parsed)) {
+      outrosCustos = parsed
+        .map((item) => ({
+          tipo: String(item?.tipo ?? "outro").trim().toLowerCase() as IngredienteInput["tipo"],
+          nome: String(item?.nome ?? "").trim(),
+          quantidade: String(item?.quantidade ?? "").trim(),
+          custo: Number(item?.custo ?? 0),
+        }))
+        .filter(
+          (item) =>
+            item.nome &&
+            item.quantidade &&
+            Number.isFinite(item.custo) &&
+            item.custo >= 0,
+        );
+    }
+  } catch {
+    return { ok: false, message: "Nao foi possivel ler os outros custos." };
+  }
+
+  const itensPrecificacao = [...ingredientes, ...outrosCustos];
+
   const supabase = getSupabaseClient();
   const { data, error } = await supabase.rpc("salvar_produto_precificacao", {
     p_tenant_id: sessao.tenantId,
     p_produto_id: id || null,
     p_nome: nome,
     p_preco_venda: precoVenda,
-    p_ingredientes: ingredientes,
+    p_ingredientes: itensPrecificacao,
   });
 
   if (error) {
@@ -100,50 +128,72 @@ export async function salvarProdutoPrecificacao(
 }
 
 export async function salvarCustoBasePrecificacao(formData: FormData) {
+  const tab = String(formData.get("tab") ?? "").trim();
+  const tabQuery = tab === "ingredientes" || tab === "custos" ? `&tab=${tab}` : "";
+
   if (!hasSupabaseEnv()) {
-    redirect("/precificacao?erro=custo-base");
+    redirect(`/precificacao?erro=custo-base${tabQuery}`);
   }
 
   const sessao = await requireSession();
-  const nome = String(formData.get("nome") ?? "").trim();
-  const unidadePadrao = String(formData.get("unidade_padrao") ?? "").trim();
+  const tipo = String(formData.get("tipo") ?? "ingrediente").trim().toLowerCase();
+  const nomeInformado = String(formData.get("nome") ?? "").trim();
+  const unidadePadraoInformada = String(formData.get("unidade_padrao") ?? "").trim();
   const custoPadraoTexto = String(formData.get("custo_padrao") ?? "").trim().replace(",", ".");
   const custoPadrao = Number(custoPadraoTexto);
 
+  const nome =
+    tipo === "ingrediente"
+      ? nomeInformado
+      : tipo === "embalagem"
+        ? "Embalagem"
+        : tipo === "gas"
+          ? "Gas"
+          : tipo === "energia"
+            ? "Energia"
+            : tipo === "mao_obra"
+              ? "Mao de obra"
+              : "Outros custos";
+
+  const unidadePadrao = tipo === "ingrediente" ? unidadePadraoInformada : "1 un";
+
   if (!nome) {
-    redirect("/precificacao?erro=custo-base");
+    redirect(`/precificacao?erro=custo-base${tabQuery}`);
   }
 
   if (!Number.isFinite(custoPadrao) || custoPadrao < 0) {
-    redirect("/precificacao?erro=custo-base");
+    redirect(`/precificacao?erro=custo-base${tabQuery}`);
   }
 
   const supabase = getSupabaseClient();
   const { error } = await supabase.rpc("salvar_custo_base_precificacao", {
     p_tenant_id: sessao.tenantId,
-    p_tipo: "ingrediente",
+    p_tipo: tipo,
     p_nome: nome,
     p_unidade_padrao: unidadePadrao || null,
     p_custo_padrao: custoPadrao,
   });
 
   if (error) {
-    redirect("/precificacao?erro=custo-base");
+    redirect(`/precificacao?erro=custo-base${tabQuery}`);
   }
 
   revalidatePath("/precificacao");
-  redirect("/precificacao?sucesso=custo-base");
+  redirect(`/precificacao?sucesso=custo-base${tabQuery}`);
 }
 
 export async function excluirIngredienteBasePrecificacao(formData: FormData) {
+  const tab = String(formData.get("tab") ?? "").trim();
+  const tabQuery = tab === "ingredientes" || tab === "custos" ? `&tab=${tab}` : "";
+
   if (!hasSupabaseEnv()) {
-    redirect("/precificacao?erro=ingrediente-exclusao");
+    redirect(`/precificacao?erro=ingrediente-exclusao${tabQuery}`);
   }
 
   const sessao = await requireSession();
   const id = String(formData.get("id") ?? "").trim();
   if (!id) {
-    redirect("/precificacao?erro=ingrediente-exclusao");
+    redirect(`/precificacao?erro=ingrediente-exclusao${tabQuery}`);
   }
 
   const supabase = getSupabaseClient();
@@ -154,7 +204,7 @@ export async function excluirIngredienteBasePrecificacao(formData: FormData) {
 
   if (!errorRpc && dataRpc) {
     revalidatePath("/precificacao");
-    redirect("/precificacao?sucesso=ingrediente-excluido");
+    redirect(`/precificacao?sucesso=ingrediente-excluido${tabQuery}`);
   }
 
   const erroRpcSemFuncao =
@@ -163,7 +213,7 @@ export async function excluirIngredienteBasePrecificacao(formData: FormData) {
       errorRpc.message.toLowerCase().includes("does not exist"));
 
   if (!erroRpcSemFuncao && errorRpc) {
-    redirect("/precificacao?erro=ingrediente-exclusao");
+    redirect(`/precificacao?erro=ingrediente-exclusao${tabQuery}`);
   }
 
   const { data: existente, error: erroBusca } = await supabase
@@ -174,7 +224,7 @@ export async function excluirIngredienteBasePrecificacao(formData: FormData) {
     .maybeSingle();
 
   if (erroBusca || !existente) {
-    redirect("/precificacao?erro=ingrediente-exclusao");
+    redirect(`/precificacao?erro=ingrediente-exclusao${tabQuery}`);
   }
 
   const { error: erroDeleteDireto } = await supabase
@@ -184,7 +234,7 @@ export async function excluirIngredienteBasePrecificacao(formData: FormData) {
     .eq("tenant_id", sessao.tenantId);
 
   if (erroDeleteDireto) {
-    redirect("/precificacao?erro=ingrediente-exclusao");
+    redirect(`/precificacao?erro=ingrediente-exclusao${tabQuery}`);
   }
 
   const { data: aindaExiste, error: erroConfirmacao } = await supabase
@@ -195,11 +245,11 @@ export async function excluirIngredienteBasePrecificacao(formData: FormData) {
     .maybeSingle();
 
   if (erroConfirmacao || aindaExiste) {
-    redirect("/precificacao?erro=ingrediente-exclusao");
+    redirect(`/precificacao?erro=ingrediente-exclusao${tabQuery}`);
   }
 
   revalidatePath("/precificacao");
-  redirect("/precificacao?sucesso=ingrediente-excluido");
+  redirect(`/precificacao?sucesso=ingrediente-excluido${tabQuery}`);
 }
 
 export async function excluirProdutoPrecificacao(formData: FormData) {

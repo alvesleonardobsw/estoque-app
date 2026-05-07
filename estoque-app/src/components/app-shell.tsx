@@ -29,7 +29,7 @@ function NavLinks() {
           <Link
             key={item.href}
             href={item.href}
-            className={`rounded-lg px-3 py-2 text-sm font-medium transition ${
+            className={`min-w-max rounded-lg px-3 py-2 text-sm font-medium transition ${
               isActive
                 ? "bg-primary text-primary-contrast"
                 : "text-foreground hover:bg-muted"
@@ -94,19 +94,19 @@ export function AppShell({ children }: { children: ReactNode }) {
       </div>
 
       <nav className="fixed inset-x-0 bottom-0 border-t border-black/10 bg-surface/95 p-2 backdrop-blur md:hidden">
-        <div className="mx-auto grid max-w-lg grid-cols-7 gap-1">
+        <div className="mx-auto flex max-w-lg gap-1 overflow-x-auto whitespace-nowrap pb-1">
           <NavLinks />
           <button
             type="button"
             onClick={alternarTema}
-            className="w-full rounded-lg px-2 py-2 text-xs font-medium text-foreground hover:bg-muted"
+            className="min-w-max rounded-lg px-2 py-2 text-xs font-medium text-foreground hover:bg-muted"
           >
             {tema === "dark" ? "Escuro" : "Claro"}
           </button>
           <form action={sair}>
             <button
               type="submit"
-              className="w-full rounded-lg px-3 py-2 text-sm font-medium text-foreground hover:bg-muted"
+              className="min-w-max rounded-lg px-3 py-2 text-sm font-medium text-foreground hover:bg-muted"
             >
               Sair
             </button>
