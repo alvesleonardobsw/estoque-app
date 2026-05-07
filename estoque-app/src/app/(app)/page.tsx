@@ -231,7 +231,7 @@ export default async function DashboardPage() {
                   key={produto.id}
                   className={`flex items-center justify-between rounded-lg border p-3 ${
                     produto.estoque_atual === 0
-                      ? "border-red-200 bg-red-50"
+                      ? "estoque-zero-alert border-red-200"
                       : "border-black/10"
                   }`}
                 >

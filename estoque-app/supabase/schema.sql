@@ -47,7 +47,7 @@ create table if not exists public.produtos (
   sabor text not null default 'frango',
   preco numeric(10, 2) not null check (preco >= 0),
   ativo boolean not null default true,
-  estoque_atual integer not null default 0 check (estoque_atual >= 0),
+  estoque_atual integer not null default 0,
   created_at timestamptz not null default now()
 );
 
@@ -73,6 +73,9 @@ alter table public.produtos
 alter table public.produtos
   add constraint produtos_sabor_check
   check (sabor in ('frango', 'carne', 'palmito', 'calabresa', 'camarao'));
+
+alter table public.produtos
+  drop constraint if exists produtos_estoque_atual_check;
 
 alter table public.produtos enable row level security;
 
@@ -256,7 +259,6 @@ declare
   v_produto_id uuid;
   v_quantidade integer;
   v_preco numeric(10, 2);
-  v_estoque integer;
   v_total numeric(12, 2) := 0;
 begin
   if p_tenant_id is null or btrim(p_tenant_id) = '' then
@@ -296,25 +298,16 @@ begin
       raise exception 'Item de pedido invalido.';
     end if;
 
-    select preco, estoque_atual
-    into v_preco, v_estoque
+    select preco
+    into v_preco
     from public.produtos
     where id = v_produto_id
       and tenant_id = p_tenant_id
-    for update;
+    limit 1;
 
     if not found then
       raise exception 'Produto nao encontrado.';
     end if;
-
-    if v_estoque < v_quantidade then
-      raise exception 'Estoque insuficiente para o produto selecionado.';
-    end if;
-
-    update public.produtos
-    set estoque_atual = estoque_atual - v_quantidade
-    where id = v_produto_id
-      and tenant_id = p_tenant_id;
 
     insert into public.pedido_itens (
       pedido_id,
@@ -331,23 +324,6 @@ begin
       v_quantidade,
       v_preco,
       v_preco * v_quantidade
-    );
-
-    insert into public.estoque_movimentos (
-      produto_id,
-      pedido_id,
-      tenant_id,
-      tipo,
-      quantidade,
-      observacao
-    )
-    values (
-      v_produto_id,
-      v_pedido_id,
-      p_tenant_id,
-      'saida',
-      v_quantidade,
-      'Baixa automatica por pedido'
     );
 
     v_total := v_total + (v_preco * v_quantidade);
@@ -382,9 +358,9 @@ declare
   v_produto_id uuid;
   v_quantidade integer;
   v_preco numeric(10, 2);
-  v_estoque integer;
   v_total numeric(12, 2) := 0;
   v_item_antigo record;
+  v_status_atual text;
 begin
   if p_tenant_id is null or btrim(p_tenant_id) = '' then
     raise exception 'Tenant invalido.';
@@ -423,34 +399,42 @@ begin
     raise exception 'Pedido nao encontrado.';
   end if;
 
-  for v_item_antigo in
-    select produto_id, quantidade
-    from public.pedido_itens
-    where pedido_id = p_pedido_id
-      and tenant_id = p_tenant_id
-  loop
-    update public.produtos
-    set estoque_atual = estoque_atual + v_item_antigo.quantidade
-    where id = v_item_antigo.produto_id
-      and tenant_id = p_tenant_id;
+  select status
+  into v_status_atual
+  from public.pedidos
+  where id = p_pedido_id
+    and tenant_id = p_tenant_id;
 
-    insert into public.estoque_movimentos (
-      produto_id,
-      pedido_id,
-      tenant_id,
-      tipo,
-      quantidade,
-      observacao
-    )
-    values (
-      v_item_antigo.produto_id,
-      p_pedido_id,
-      p_tenant_id,
-      'entrada',
-      v_item_antigo.quantidade,
-      'Devolucao por alteracao de pedido'
-    );
-  end loop;
+  if v_status_atual = 'entregue' then
+    for v_item_antigo in
+      select produto_id, quantidade
+      from public.pedido_itens
+      where pedido_id = p_pedido_id
+        and tenant_id = p_tenant_id
+    loop
+      update public.produtos
+      set estoque_atual = estoque_atual + v_item_antigo.quantidade
+      where id = v_item_antigo.produto_id
+        and tenant_id = p_tenant_id;
+
+      insert into public.estoque_movimentos (
+        produto_id,
+        pedido_id,
+        tenant_id,
+        tipo,
+        quantidade,
+        observacao
+      )
+      values (
+        v_item_antigo.produto_id,
+        p_pedido_id,
+        p_tenant_id,
+        'entrada',
+        v_item_antigo.quantidade,
+        'Devolucao por alteracao de pedido entregue'
+      );
+    end loop;
+  end if;
 
   delete from public.pedido_itens
   where pedido_id = p_pedido_id
@@ -466,25 +450,16 @@ begin
       raise exception 'Item de pedido invalido.';
     end if;
 
-    select preco, estoque_atual
-    into v_preco, v_estoque
+    select preco
+    into v_preco
     from public.produtos
     where id = v_produto_id
       and tenant_id = p_tenant_id
-    for update;
+    limit 1;
 
     if not found then
       raise exception 'Produto nao encontrado.';
     end if;
-
-    if v_estoque < v_quantidade then
-      raise exception 'Estoque insuficiente para o produto selecionado.';
-    end if;
-
-    update public.produtos
-    set estoque_atual = estoque_atual - v_quantidade
-    where id = v_produto_id
-      and tenant_id = p_tenant_id;
 
     insert into public.pedido_itens (
       pedido_id,
@@ -503,25 +478,39 @@ begin
       v_preco * v_quantidade
     );
 
-    insert into public.estoque_movimentos (
-      produto_id,
-      pedido_id,
-      tenant_id,
-      tipo,
-      quantidade,
-      observacao
-    )
-    values (
-      v_produto_id,
-      p_pedido_id,
-      p_tenant_id,
-      'saida',
-      v_quantidade,
-      'Baixa por alteracao de pedido'
-    );
-
     v_total := v_total + (v_preco * v_quantidade);
   end loop;
+
+  if v_status_atual = 'entregue' then
+    for v_item_antigo in
+      select produto_id, quantidade
+      from public.pedido_itens
+      where pedido_id = p_pedido_id
+        and tenant_id = p_tenant_id
+    loop
+      update public.produtos
+      set estoque_atual = estoque_atual - v_item_antigo.quantidade
+      where id = v_item_antigo.produto_id
+        and tenant_id = p_tenant_id;
+
+      insert into public.estoque_movimentos (
+        produto_id,
+        pedido_id,
+        tenant_id,
+        tipo,
+        quantidade,
+        observacao
+      )
+      values (
+        v_item_antigo.produto_id,
+        p_pedido_id,
+        p_tenant_id,
+        'saida',
+        v_item_antigo.quantidade,
+        'Baixa por alteracao de pedido entregue'
+      );
+    end loop;
+  end if;
 
   update public.pedidos
   set cliente_id = p_cliente_id,
@@ -545,6 +534,7 @@ set search_path = public
 as $$
 declare
   v_item record;
+  v_status_atual text;
 begin
   if p_tenant_id is null or btrim(p_tenant_id) = '' then
     raise exception 'Tenant invalido.';
@@ -564,34 +554,42 @@ begin
     raise exception 'Pedido nao encontrado.';
   end if;
 
-  for v_item in
-    select produto_id, quantidade
-    from public.pedido_itens
-    where pedido_id = p_pedido_id
-      and tenant_id = p_tenant_id
-  loop
-    update public.produtos
-    set estoque_atual = estoque_atual + v_item.quantidade
-    where id = v_item.produto_id
-      and tenant_id = p_tenant_id;
+  select status
+  into v_status_atual
+  from public.pedidos
+  where id = p_pedido_id
+    and tenant_id = p_tenant_id;
 
-    insert into public.estoque_movimentos (
-      produto_id,
-      pedido_id,
-      tenant_id,
-      tipo,
-      quantidade,
-      observacao
-    )
-    values (
-      v_item.produto_id,
-      p_pedido_id,
-      p_tenant_id,
-      'entrada',
-      v_item.quantidade,
-      'Devolucao por exclusao de pedido'
-    );
-  end loop;
+  if v_status_atual = 'entregue' then
+    for v_item in
+      select produto_id, quantidade
+      from public.pedido_itens
+      where pedido_id = p_pedido_id
+        and tenant_id = p_tenant_id
+    loop
+      update public.produtos
+      set estoque_atual = estoque_atual + v_item.quantidade
+      where id = v_item.produto_id
+        and tenant_id = p_tenant_id;
+
+      insert into public.estoque_movimentos (
+        produto_id,
+        pedido_id,
+        tenant_id,
+        tipo,
+        quantidade,
+        observacao
+      )
+      values (
+        v_item.produto_id,
+        p_pedido_id,
+        p_tenant_id,
+        'entrada',
+        v_item.quantidade,
+        'Devolucao por exclusao de pedido entregue'
+      );
+    end loop;
+  end if;
 
   delete from public.pedidos
   where id = p_pedido_id
@@ -651,6 +649,9 @@ language plpgsql
 security definer
 set search_path = public
 as $$
+declare
+  v_status_atual text;
+  v_item record;
 begin
   if p_tenant_id is null or btrim(p_tenant_id) = '' then
     raise exception 'Tenant invalido.';
@@ -664,6 +665,79 @@ begin
     raise exception 'Status invalido.';
   end if;
 
+  select status
+  into v_status_atual
+  from public.pedidos
+  where id = p_pedido_id
+    and tenant_id = p_tenant_id
+  for update;
+
+  if not found then
+    raise exception 'Pedido nao encontrado.';
+  end if;
+
+  if v_status_atual <> p_status then
+    if v_status_atual = 'pendente' and p_status = 'entregue' then
+      for v_item in
+        select produto_id, quantidade
+        from public.pedido_itens
+        where pedido_id = p_pedido_id
+          and tenant_id = p_tenant_id
+      loop
+        update public.produtos
+        set estoque_atual = estoque_atual - v_item.quantidade
+        where id = v_item.produto_id
+          and tenant_id = p_tenant_id;
+
+        insert into public.estoque_movimentos (
+          produto_id,
+          pedido_id,
+          tenant_id,
+          tipo,
+          quantidade,
+          observacao
+        )
+        values (
+          v_item.produto_id,
+          p_pedido_id,
+          p_tenant_id,
+          'saida',
+          v_item.quantidade,
+          'Baixa por entrega de pedido'
+        );
+      end loop;
+    elsif v_status_atual = 'entregue' and p_status = 'pendente' then
+      for v_item in
+        select produto_id, quantidade
+        from public.pedido_itens
+        where pedido_id = p_pedido_id
+          and tenant_id = p_tenant_id
+      loop
+        update public.produtos
+        set estoque_atual = estoque_atual + v_item.quantidade
+        where id = v_item.produto_id
+          and tenant_id = p_tenant_id;
+
+        insert into public.estoque_movimentos (
+          produto_id,
+          pedido_id,
+          tenant_id,
+          tipo,
+          quantidade,
+          observacao
+        )
+        values (
+          v_item.produto_id,
+          p_pedido_id,
+          p_tenant_id,
+          'entrada',
+          v_item.quantidade,
+          'Devolucao por retorno do pedido para pendente'
+        );
+      end loop;
+    end if;
+  end if;
+
   update public.pedidos
   set
     status = p_status,
@@ -673,10 +747,6 @@ begin
     end
   where id = p_pedido_id
     and tenant_id = p_tenant_id;
-
-  if not found then
-    raise exception 'Pedido nao encontrado.';
-  end if;
 
   return p_pedido_id;
 end;

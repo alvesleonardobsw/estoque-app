@@ -234,7 +234,7 @@ export default async function ProdutosPage({ searchParams }: PageProps) {
                 <tr
                   key={produto.id}
                   className={`border-b border-black/5 ${
-                    produto.estoque_atual === 0 ? "bg-red-50" : ""
+                    produto.estoque_atual === 0 ? "estoque-zero-row" : ""
                   }`}
                 >
                   <td className="px-2 py-2">{produto.nome}</td>

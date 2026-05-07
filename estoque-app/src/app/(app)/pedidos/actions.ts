@@ -98,7 +98,7 @@ export async function salvarPedido(_: ActionState, formData: FormData): Promise<
     redirect("/pedidos");
   }
 
-  return { ok: true, message: "Pedido criado com sucesso. Estoque atualizado." };
+  return { ok: true, message: "Pedido salvo com sucesso." };
 }
 
 export async function excluirPedido(formData: FormData) {

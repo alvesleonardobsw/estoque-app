@@ -9,6 +9,15 @@
   --muted: #dce4d9;
 }
 
+[data-theme="dark"] {
+  --background: #1c1c1c;
+  --foreground: #f2f2f2;
+  --surface: #252525;
+  --primary: #5ba26b;
+  --primary-contrast: #0d140e;
+  --muted: #333333;
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -24,4 +33,39 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-geist-sans), "Segoe UI", sans-serif;
+}
+
+.estoque-zero-row {
+  background: #fef2f2;
+}
+
+[data-theme="dark"] .estoque-zero-row {
+  background: #3a2626;
+}
+
+.estoque-zero-alert {
+  background: #fef2f2;
+}
+
+[data-theme="dark"] .estoque-zero-alert {
+  background: #3a2626;
+  border-color: #7f1d1d;
+}
+
+[data-theme="dark"] input,
+[data-theme="dark"] select,
+[data-theme="dark"] textarea {
+  background: #2b2b2b;
+  color: #f2f2f2;
+  border-color: #4a4a4a;
+}
+
+[data-theme="dark"] input::placeholder,
+[data-theme="dark"] textarea::placeholder {
+  color: #a8a8a8;
+}
+
+[data-theme="dark"] select option {
+  background: #2b2b2b;
+  color: #f2f2f2;
 }
