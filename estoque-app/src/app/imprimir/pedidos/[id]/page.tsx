@@ -99,7 +99,7 @@ export default async function ImprimirPedidoPage({ params }: PageProps) {
 
       <PrintControls />
 
-      <section className="rounded border border-black/20 p-3">
+      <section className="rounded border border-black/20 p-3 font-bold">
         <h1 className="text-center text-base font-semibold">Comanda do Pedido</h1>
         <p className="mt-1 text-center text-xs">Pedido #{pedido.id.slice(0, 8).toUpperCase()}</p>
 
@@ -140,7 +140,7 @@ export default async function ImprimirPedidoPage({ params }: PageProps) {
 
         <hr className="my-3 border-dashed border-black/30" />
 
-        <p className="flex items-center justify-between text-base font-semibold">
+        <p className="flex items-center justify-between text-base font-bold">
           <span>Total</span>
           <span>{formatarMoeda(pedido.total)}</span>
         </p>
