@@ -87,6 +87,14 @@ export default async function ImprimirPedidoPage({ params }: PageProps) {
   }
 
   const pedido = data as PedidoDetalhe;
+  const nomeCliente = extrairNomeRelacao(pedido.clientes, "Nao informado");
+  const codigoPedido = pedido.id.slice(0, 8).toUpperCase();
+  const nomeArquivo = `comanda-${nomeCliente
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "")}-${codigoPedido}.png`;
 
   return (
     <main className="mx-auto max-w-md p-4 text-sm text-black">
@@ -97,16 +105,16 @@ export default async function ImprimirPedidoPage({ params }: PageProps) {
         }
       `}</style>
 
-      <PrintControls />
+      <PrintControls comandaId="comanda" nomeArquivo={nomeArquivo} />
 
-      <section className="rounded border border-black/20 p-3 font-bold">
+      <section id="comanda" className="rounded border border-black/20 p-3 font-bold">
         <h1 className="text-center text-base font-semibold">Comanda do Pedido</h1>
-        <p className="mt-1 text-center text-xs">Pedido #{pedido.id.slice(0, 8).toUpperCase()}</p>
+        <p className="mt-1 text-center text-xs">Pedido #{codigoPedido}</p>
 
         <hr className="my-3 border-dashed border-black/30" />
 
         <p>
-          <strong>Cliente:</strong> {extrairNomeRelacao(pedido.clientes, "Nao informado")}
+          <strong>Cliente:</strong> {nomeCliente}
         </p>
         <p>
           <strong>Endereco:</strong> {extrairEnderecoRelacao(pedido.clientes, "Nao informado")}
