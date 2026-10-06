@@ -38,6 +38,17 @@ export function ProdutoForm({
     setEstoqueAtual(produtoEdicao?.estoque_atual ?? 0);
   }
 
+  // Depois de cadastrar, o navegador limpa os campos do formulario; o estado controlado
+  // precisa acompanhar para a tela nao mostrar valores do produto anterior.
+  const [estadoAnterior, setEstadoAnterior] = useState(state);
+  if (state !== estadoAnterior) {
+    setEstadoAnterior(state);
+    if (state.ok && !emEdicao) {
+      setEstoqueAtual(0);
+      setPrecoVariavel(false);
+    }
+  }
+
   return (
     <form action={formAction} className="space-y-4 rounded-xl border border-black/10 bg-surface p-4">
       <h2 className="text-lg font-medium">{emEdicao ? "Editar produto" : "Novo produto"}</h2>
@@ -162,25 +173,26 @@ export function ProdutoForm({
         </button>
 
         {emEdicao ? (
-          <form action={excluirProduto}>
-            <input type="hidden" name="id" value={produtoEdicao?.id ?? ""} />
-            <button
-              type="submit"
-              onClick={(event) => {
-                const confirmado = window.confirm("Tem certeza que deseja excluir este produto?");
-                if (!confirmado) {
-                  event.preventDefault();
-                }
-              }}
-              className="rounded-lg border border-red-300 bg-red-50 px-4 py-2 text-sm font-medium text-red-700"
-              title="Excluir produto"
-            >
-              <span className="flex items-center gap-2">
-                <TrashIcon />
-                Excluir
-              </span>
-            </button>
-          </form>
+          // Botao com action propria dentro do formulario principal (que ja envia o id):
+          // formulario dentro de formulario e HTML invalido.
+          <button
+            type="submit"
+            formAction={excluirProduto}
+            formNoValidate
+            onClick={(event) => {
+              const confirmado = window.confirm("Tem certeza que deseja excluir este produto?");
+              if (!confirmado) {
+                event.preventDefault();
+              }
+            }}
+            className="rounded-lg border border-red-300 bg-red-50 px-4 py-2 text-sm font-medium text-red-700"
+            title="Excluir produto"
+          >
+            <span className="flex items-center gap-2">
+              <TrashIcon />
+              Excluir
+            </span>
+          </button>
         ) : null}
 
         {emEdicao || mostrarCancelarNovo ? (

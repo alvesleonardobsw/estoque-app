@@ -107,6 +107,17 @@ export function PedidoForm({
   );
   const [clienteId, setClienteId] = useState(pedidoEdicao?.cliente_id ?? "");
 
+  // Depois de criar o pedido, o navegador limpa os campos visiveis, mas os itens ficam
+  // no estado e seriam reenviados no proximo pedido. Zera tudo junto.
+  const [estadoAnterior, setEstadoAnterior] = useState(state);
+  if (state !== estadoAnterior) {
+    setEstadoAnterior(state);
+    if (state.ok && !emEdicao) {
+      setItens([{ sabor: "", produto_id: "", quantidade: 1, preco_unitario: "" }]);
+      setClienteId("");
+    }
+  }
+
   const produtosPorId = useMemo(() => {
     return new Map(produtos.map((produto) => [produto.id, produto]));
   }, [produtos]);

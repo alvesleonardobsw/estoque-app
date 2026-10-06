@@ -86,25 +86,26 @@ export function ClienteForm({
         </button>
 
         {emEdicao ? (
-          <form action={excluirCliente}>
-            <input type="hidden" name="id" value={clienteEdicao?.id ?? ""} />
-            <button
-              type="submit"
-              onClick={(event) => {
-                const confirmado = window.confirm("Tem certeza que deseja excluir este cliente?");
-                if (!confirmado) {
-                  event.preventDefault();
-                }
-              }}
-              className="rounded-lg border border-red-300 bg-red-50 px-4 py-2 text-sm font-medium text-red-700"
-              title="Excluir cliente"
-            >
-              <span className="flex items-center gap-2">
-                <TrashIcon />
-                Excluir
-              </span>
-            </button>
-          </form>
+          // Botao com action propria dentro do formulario principal (que ja envia o id):
+          // formulario dentro de formulario e HTML invalido.
+          <button
+            type="submit"
+            formAction={excluirCliente}
+            formNoValidate
+            onClick={(event) => {
+              const confirmado = window.confirm("Tem certeza que deseja excluir este cliente?");
+              if (!confirmado) {
+                event.preventDefault();
+              }
+            }}
+            className="rounded-lg border border-red-300 bg-red-50 px-4 py-2 text-sm font-medium text-red-700"
+            title="Excluir cliente"
+          >
+            <span className="flex items-center gap-2">
+              <TrashIcon />
+              Excluir
+            </span>
+          </button>
         ) : null}
 
         {emEdicao || mostrarCancelarNovo ? (
