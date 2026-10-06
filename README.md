@@ -1,58 +1,54 @@
 # Estoque App
 
-Aplicacao web responsiva para controle de estoque, pedidos e clientes.
+Aplicação web responsiva para controle de estoque, clientes, pedidos e precificação.
 
-## 1) Rodar local
+Stack: Next.js 16 (App Router), React 19, Tailwind CSS 4 e Supabase. Hospedada na Vercel, com deploy automático da branch `main`.
 
-No Windows (PowerShell), use:
+## Rodar local
+
+Pré-requisito: Node.js 20 ou mais recente.
 
 ```powershell
-cd "C:\Users\Leo\Documents\New project\estoque-app"
-$env:Path = "C:\Program Files\nodejs;" + [System.Environment]::GetEnvironmentVariable('Path','Machine') + ';' + [System.Environment]::GetEnvironmentVariable('Path','User')
-& "C:\Program Files\nodejs\npm.cmd" install
-& "C:\Program Files\nodejs\npm.cmd" run dev -- --hostname 0.0.0.0
+cd C:\Users\Leo\Projetos\estoque-app
+npm install
+npm run dev
 ```
 
-Abra `http://localhost:3000`.
+Abra http://localhost:3000. Para testar pelo celular na mesma rede, use `npm run dev -- --hostname 0.0.0.0`.
 
-## 2) Criar projeto no Supabase
+## Variáveis de ambiente
 
-1. Acesse [https://supabase.com](https://supabase.com) e crie um projeto.
-2. No menu do projeto, abra `SQL Editor`.
-3. Cole e execute o SQL do arquivo:
-   - `supabase/schema.sql`
-4. Sempre que adicionarmos novas tabelas no projeto, execute novamente esse arquivo (ele usa `if not exists`).
+Copie `.env.example` para `.env.local` e preencha:
 
-## 3) Configurar variaveis de ambiente
+| Variável | Para que serve |
+| --- | --- |
+| `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` | Acesso ao banco (só no servidor) |
+| `AUTH_USER`, `AUTH_PASS`, `AUTH_TENANT_1`, `AUTH_APP_NAME_1` | Conta de login principal |
+| `AUTH_USER_2`, `AUTH_PASS_2`, `AUTH_TENANT_2`, `AUTH_APP_NAME_2` | Segunda conta (opcional) |
+| `AUTH_SESSION_SECRET` | Assina o cookie de sessão |
 
-1. Crie um arquivo `.env.local` na raiz do projeto.
-2. Copie o conteudo de `.env.example`.
-3. Preencha com os valores do Supabase:
-   - `NEXT_PUBLIC_SUPABASE_URL`
-   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+Localmente, use sempre o Supabase de **dev**, nunca o de produção. Na Vercel, Production aponta para o banco de produção, enquanto Preview e Development apontam para o de dev.
 
-Exemplo:
+## Banco de dados
 
-```env
-NEXT_PUBLIC_SUPABASE_URL=https://seu-projeto.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=sua-chave-anon
-```
+O schema completo está em `supabase/schema.sql` e é idempotente: pode ser executado de novo sem perder dados. Para alterar o schema:
 
-## 4) Funcionalidades prontas
+1. Edite `supabase/schema.sql`.
+2. Execute no SQL Editor do projeto de **dev** e teste.
+3. Depois de validado, execute no projeto de produção.
 
-- Layout responsivo (desktop e celular)
-- Paginas base: Dashboard, Clientes, Produtos e Pedidos
-- CRUD inicial de Clientes:
-  - listar clientes
-  - cadastrar cliente
-- CRUD inicial de Produtos:
-  - listar produtos
-  - cadastrar produto
-- Pedidos com baixa automatica de estoque:
-  - selecionar cliente
-  - adicionar itens no pedido
-  - reduzir estoque automaticamente ao confirmar pedido
+## Scripts
 
-## 5) Proximo passo sugerido
+- `npm run dev` — servidor de desenvolvimento
+- `npm run lint` — ESLint
+- `npm run build` — build de produção
+- `npx tsc --noEmit` — checagem de tipos
 
-Implementar autenticacao (login) e perfis de acesso (admin/operador).
+## Funcionalidades
+
+- Login com sessão assinada e dados separados por conta (multi-tenant)
+- Dashboard
+- Clientes, produtos e pedidos: cadastro, edição e exclusão
+- Pedidos com baixa automática de estoque, status, data de entrega prevista e impressão de comanda
+- Precificação: ingredientes, custos base e custo por produto
+- Tema claro/escuro

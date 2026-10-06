@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useSyncExternalStore, type ReactNode } from "react";
 import { sair } from "@/app/login/actions";
 
 type NavItem = {
@@ -43,26 +43,33 @@ function NavLinks() {
   );
 }
 
+const ouvintesTema = new Set<() => void>();
+
+function assinarTema(ouvinte: () => void) {
+  ouvintesTema.add(ouvinte);
+  window.addEventListener("storage", ouvinte);
+  return () => {
+    ouvintesTema.delete(ouvinte);
+    window.removeEventListener("storage", ouvinte);
+  };
+}
+
+function lerTema(): "light" | "dark" {
+  const temaSalvo = window.localStorage.getItem("theme");
+  if (temaSalvo === "light" || temaSalvo === "dark") return temaSalvo;
+  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+}
+
 export function AppShell({ children }: { children: ReactNode }) {
-  const [tema, setTema] = useState<"light" | "dark">("light");
+  const tema = useSyncExternalStore(assinarTema, lerTema, () => "light" as const);
 
   useEffect(() => {
-    const temaSalvo = window.localStorage.getItem("theme");
-    const temaInicial =
-      temaSalvo === "light" || temaSalvo === "dark"
-        ? temaSalvo
-        : window.matchMedia("(prefers-color-scheme: dark)").matches
-          ? "dark"
-          : "light";
-    document.documentElement.setAttribute("data-theme", temaInicial);
-    setTema(temaInicial);
-  }, []);
+    document.documentElement.setAttribute("data-theme", tema);
+  }, [tema]);
 
   function alternarTema() {
-    const proximoTema = tema === "dark" ? "light" : "dark";
-    document.documentElement.setAttribute("data-theme", proximoTema);
-    window.localStorage.setItem("theme", proximoTema);
-    setTema(proximoTema);
+    window.localStorage.setItem("theme", tema === "dark" ? "light" : "dark");
+    ouvintesTema.forEach((ouvinte) => ouvinte());
   }
 
   return (

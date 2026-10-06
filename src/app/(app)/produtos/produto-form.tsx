@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
+import { useActionState, useState } from "react";
 import Link from "next/link";
 import { excluirProduto, salvarProduto } from "./actions";
 import { TrashIcon } from "@/components/action-icons";
@@ -29,9 +29,12 @@ export function ProdutoForm({
   const emEdicao = Boolean(produtoEdicao);
   const [estoqueAtual, setEstoqueAtual] = useState<number>(produtoEdicao?.estoque_atual ?? 0);
 
-  useEffect(() => {
+  const chaveEdicao = `${produtoEdicao?.id ?? ""}:${produtoEdicao?.estoque_atual ?? 0}`;
+  const [chaveAnterior, setChaveAnterior] = useState(chaveEdicao);
+  if (chaveEdicao !== chaveAnterior) {
+    setChaveAnterior(chaveEdicao);
     setEstoqueAtual(produtoEdicao?.estoque_atual ?? 0);
-  }, [produtoEdicao?.id, produtoEdicao?.estoque_atual]);
+  }
 
   return (
     <form action={formAction} className="space-y-4 rounded-xl border border-black/10 bg-surface p-4">
