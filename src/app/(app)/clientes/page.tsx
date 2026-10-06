@@ -30,8 +30,16 @@ async function listarClientes(tenantId: string) {
   return { clientes: (data ?? []) as Cliente[], erro: "" };
 }
 
+function normalizarTexto(valor: string) {
+  return valor
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .trim();
+}
+
 type PageProps = {
-  searchParams: Promise<{ editar?: string; erro?: string; novo?: string }>;
+  searchParams: Promise<{ editar?: string; erro?: string; novo?: string; busca?: string }>;
 };
 
 export default async function ClientesPage({ searchParams }: PageProps) {
@@ -40,9 +48,14 @@ export default async function ClientesPage({ searchParams }: PageProps) {
   const editarId = typeof params.editar === "string" ? params.editar : "";
   const erroAcao = typeof params.erro === "string" ? params.erro : "";
   const novo = typeof params.novo === "string" ? params.novo : "";
+  const busca = typeof params.busca === "string" ? params.busca.trim() : "";
   const { clientes, erro } = await listarClientes(sessao.tenantId);
   const clienteEdicao = clientes.find((cliente) => cliente.id === editarId) ?? null;
   const mostrarFormulario = Boolean(clienteEdicao) || novo === "1";
+  const buscaNormalizada = normalizarTexto(busca);
+  const clientesFiltrados = buscaNormalizada
+    ? clientes.filter((cliente) => normalizarTexto(cliente.nome).includes(buscaNormalizada))
+    : clientes;
 
   return (
     <section className="space-y-6">
@@ -93,6 +106,33 @@ export default async function ClientesPage({ searchParams }: PageProps) {
       <article className="rounded-xl border border-black/10 bg-surface p-4">
         <h2 className="text-lg font-medium">Clientes cadastrados</h2>
 
+        <form method="get" className="mt-3 grid gap-2 rounded-lg border border-black/10 p-3 md:grid-cols-[1fr_auto_auto]">
+          <label className="flex flex-col gap-1 text-sm">
+            Buscar por nome
+            <input
+              type="search"
+              name="busca"
+              defaultValue={busca}
+              placeholder="Digite o nome do cliente"
+              className="rounded-md border border-black/15 bg-white px-2 py-2"
+            />
+          </label>
+
+          <button
+            type="submit"
+            className="self-end rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-contrast"
+          >
+            Buscar
+          </button>
+
+          <Link
+            href="/clientes"
+            className="self-end rounded-md border border-black/20 px-3 py-2 text-center text-sm"
+          >
+            Limpar
+          </Link>
+        </form>
+
         <div className="mt-3 overflow-x-auto">
           <table className="min-w-full text-left text-sm">
             <thead>
@@ -104,7 +144,7 @@ export default async function ClientesPage({ searchParams }: PageProps) {
               </tr>
             </thead>
             <tbody>
-              {clientes.map((cliente) => (
+              {clientesFiltrados.map((cliente) => (
                 <tr key={cliente.id} className="border-b border-black/5">
                   <td className="px-2 py-2">{cliente.nome}</td>
                   <td className="px-2 py-2">{cliente.telefone || "-"}</td>
@@ -152,6 +192,10 @@ export default async function ClientesPage({ searchParams }: PageProps) {
         {clientes.length === 0 ? (
           <p className="mt-3 text-sm text-foreground/70">
             Nenhum cliente cadastrado ainda.
+          </p>
+        ) : clientesFiltrados.length === 0 ? (
+          <p className="mt-3 text-sm text-foreground/70">
+            Nenhum cliente encontrado para &quot;{busca}&quot;.
           </p>
         ) : null}
       </article>
