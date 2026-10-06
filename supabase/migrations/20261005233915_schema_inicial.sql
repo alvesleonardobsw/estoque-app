@@ -2,27 +2,47 @@ create extension if not exists pgcrypto;
 
 create table if not exists public.clientes (
   id uuid primary key default gen_random_uuid(),
-  tenant_id text not null,
+  tenant_id text not null default 'ledaempadas',
   nome text not null,
   telefone text,
   endereco text,
   created_at timestamptz not null default now()
 );
 
--- RLS ligado e sem políticas: só o service_role (usado pelo servidor do app) acessa as tabelas.
 alter table public.clientes enable row level security;
 
 drop policy if exists "Permitir leitura de clientes" on public.clientes;
+create policy "Permitir leitura de clientes"
+on public.clientes
+for select
+to anon
+using (true);
 
 drop policy if exists "Permitir criacao de clientes" on public.clientes;
+create policy "Permitir criacao de clientes"
+on public.clientes
+for insert
+to anon
+with check (true);
 
 drop policy if exists "Permitir atualizacao de clientes" on public.clientes;
+create policy "Permitir atualizacao de clientes"
+on public.clientes
+for update
+to anon
+using (true)
+with check (true);
 
 drop policy if exists "Permitir exclusao de clientes" on public.clientes;
+create policy "Permitir exclusao de clientes"
+on public.clientes
+for delete
+to anon
+using (true);
 
 create table if not exists public.produtos (
   id uuid primary key default gen_random_uuid(),
-  tenant_id text not null,
+  tenant_id text not null default 'ledaempadas',
   nome text not null,
   sabor text not null default 'frango',
   preco numeric(10, 2) not null check (preco >= 0),
@@ -60,16 +80,37 @@ alter table public.produtos
 alter table public.produtos enable row level security;
 
 drop policy if exists "Permitir leitura de produtos" on public.produtos;
+create policy "Permitir leitura de produtos"
+on public.produtos
+for select
+to anon
+using (true);
 
 drop policy if exists "Permitir criacao de produtos" on public.produtos;
+create policy "Permitir criacao de produtos"
+on public.produtos
+for insert
+to anon
+with check (true);
 
 drop policy if exists "Permitir atualizacao de produtos" on public.produtos;
+create policy "Permitir atualizacao de produtos"
+on public.produtos
+for update
+to anon
+using (true)
+with check (true);
 
 drop policy if exists "Permitir exclusao de produtos" on public.produtos;
+create policy "Permitir exclusao de produtos"
+on public.produtos
+for delete
+to anon
+using (true);
 
 create table if not exists public.pedidos (
   id uuid primary key default gen_random_uuid(),
-  tenant_id text not null,
+  tenant_id text not null default 'ledaempadas',
   cliente_id uuid not null references public.clientes (id),
   status text not null default 'pendente' check (status in ('pendente', 'entregue')),
   data_entrega_prevista date,
@@ -89,7 +130,7 @@ alter table public.pedidos
 
 create table if not exists public.pedido_itens (
   id uuid primary key default gen_random_uuid(),
-  tenant_id text not null,
+  tenant_id text not null default 'ledaempadas',
   pedido_id uuid not null references public.pedidos (id) on delete cascade,
   produto_id uuid not null references public.produtos (id),
   quantidade integer not null check (quantidade > 0),
@@ -100,7 +141,7 @@ create table if not exists public.pedido_itens (
 
 create table if not exists public.estoque_movimentos (
   id uuid primary key default gen_random_uuid(),
-  tenant_id text not null,
+  tenant_id text not null default 'ledaempadas',
   produto_id uuid not null references public.produtos (id),
   pedido_id uuid references public.pedidos (id) on delete set null,
   tipo text not null check (tipo in ('entrada', 'saida')),
@@ -184,10 +225,25 @@ alter table public.pedido_itens enable row level security;
 alter table public.estoque_movimentos enable row level security;
 
 drop policy if exists "Permitir leitura de pedidos" on public.pedidos;
+create policy "Permitir leitura de pedidos"
+on public.pedidos
+for select
+to anon
+using (true);
 
 drop policy if exists "Permitir leitura de pedido_itens" on public.pedido_itens;
+create policy "Permitir leitura de pedido_itens"
+on public.pedido_itens
+for select
+to anon
+using (true);
 
 drop policy if exists "Permitir leitura de estoque_movimentos" on public.estoque_movimentos;
+create policy "Permitir leitura de estoque_movimentos"
+on public.estoque_movimentos
+for select
+to anon
+using (true);
 
 drop function if exists public.registrar_pedido(uuid, jsonb);
 
@@ -282,8 +338,7 @@ begin
 end;
 $$;
 
-revoke execute on function public.registrar_pedido(text, uuid, jsonb) from public, anon, authenticated;
-grant execute on function public.registrar_pedido(text, uuid, jsonb) to service_role;
+grant execute on function public.registrar_pedido(text, uuid, jsonb) to anon;
 
 drop function if exists public.atualizar_pedido(uuid, uuid, jsonb);
 
@@ -467,8 +522,7 @@ begin
 end;
 $$;
 
-revoke execute on function public.atualizar_pedido(text, uuid, uuid, jsonb) from public, anon, authenticated;
-grant execute on function public.atualizar_pedido(text, uuid, uuid, jsonb) to service_role;
+grant execute on function public.atualizar_pedido(text, uuid, uuid, jsonb) to anon;
 
 drop function if exists public.excluir_pedido(uuid);
 
@@ -545,8 +599,7 @@ begin
 end;
 $$;
 
-revoke execute on function public.excluir_pedido(text, uuid) from public, anon, authenticated;
-grant execute on function public.excluir_pedido(text, uuid) to service_role;
+grant execute on function public.excluir_pedido(text, uuid) to anon;
 
 drop function if exists public.atualizar_data_entrega_prevista_pedido(uuid, date);
 
@@ -582,8 +635,7 @@ begin
 end;
 $$;
 
-revoke execute on function public.atualizar_data_entrega_prevista_pedido(text, uuid, date) from public, anon, authenticated;
-grant execute on function public.atualizar_data_entrega_prevista_pedido(text, uuid, date) to service_role;
+grant execute on function public.atualizar_data_entrega_prevista_pedido(text, uuid, date) to anon;
 
 drop function if exists public.atualizar_status_pedido(uuid, text);
 
@@ -700,12 +752,11 @@ begin
 end;
 $$;
 
-revoke execute on function public.atualizar_status_pedido(text, uuid, text) from public, anon, authenticated;
-grant execute on function public.atualizar_status_pedido(text, uuid, text) to service_role;
+grant execute on function public.atualizar_status_pedido(text, uuid, text) to anon;
 
 create table if not exists public.precificacao_produtos (
   id uuid primary key default gen_random_uuid(),
-  tenant_id text not null,
+  tenant_id text not null default 'ledaempadas',
   nome text not null,
   preco_venda numeric(10, 2),
   created_at timestamptz not null default now()
@@ -713,7 +764,7 @@ create table if not exists public.precificacao_produtos (
 
 create table if not exists public.precificacao_ingredientes (
   id uuid primary key default gen_random_uuid(),
-  tenant_id text not null,
+  tenant_id text not null default 'ledaempadas',
   produto_id uuid not null references public.precificacao_produtos (id) on delete cascade,
   tipo text not null default 'ingrediente',
   nome text not null,
@@ -724,7 +775,7 @@ create table if not exists public.precificacao_ingredientes (
 
 create table if not exists public.precificacao_custos_base (
   id uuid primary key default gen_random_uuid(),
-  tenant_id text not null,
+  tenant_id text not null default 'ledaempadas',
   tipo text not null default 'ingrediente',
   nome text not null,
   unidade_padrao text,
@@ -842,10 +893,25 @@ alter table public.precificacao_ingredientes enable row level security;
 alter table public.precificacao_custos_base enable row level security;
 
 drop policy if exists "Permitir leitura de precificacao_produtos" on public.precificacao_produtos;
+create policy "Permitir leitura de precificacao_produtos"
+on public.precificacao_produtos
+for select
+to anon
+using (true);
 
 drop policy if exists "Permitir leitura de precificacao_ingredientes" on public.precificacao_ingredientes;
+create policy "Permitir leitura de precificacao_ingredientes"
+on public.precificacao_ingredientes
+for select
+to anon
+using (true);
 
 drop policy if exists "Permitir leitura de precificacao_custos_base" on public.precificacao_custos_base;
+create policy "Permitir leitura de precificacao_custos_base"
+on public.precificacao_custos_base
+for select
+to anon
+using (true);
 
 drop function if exists public.salvar_produto_precificacao(text, uuid, text, numeric, jsonb);
 
@@ -946,8 +1012,7 @@ begin
 end;
 $$;
 
-revoke execute on function public.salvar_produto_precificacao(text, uuid, text, numeric, jsonb) from public, anon, authenticated;
-grant execute on function public.salvar_produto_precificacao(text, uuid, text, numeric, jsonb) to service_role;
+grant execute on function public.salvar_produto_precificacao(text, uuid, text, numeric, jsonb) to anon;
 
 drop function if exists public.salvar_custo_base_precificacao(text, text, text, text, numeric);
 
@@ -1004,8 +1069,7 @@ begin
 end;
 $$;
 
-revoke execute on function public.salvar_custo_base_precificacao(text, text, text, text, numeric) from public, anon, authenticated;
-grant execute on function public.salvar_custo_base_precificacao(text, text, text, text, numeric) to service_role;
+grant execute on function public.salvar_custo_base_precificacao(text, text, text, text, numeric) to anon;
 
 drop function if exists public.excluir_custo_base_precificacao(text, uuid);
 
@@ -1039,8 +1103,7 @@ begin
 end;
 $$;
 
-revoke execute on function public.excluir_custo_base_precificacao(text, uuid) from public, anon, authenticated;
-grant execute on function public.excluir_custo_base_precificacao(text, uuid) to service_role;
+grant execute on function public.excluir_custo_base_precificacao(text, uuid) to anon;
 
 drop function if exists public.excluir_produto_precificacao(text, uuid);
 
@@ -1074,5 +1137,4 @@ begin
 end;
 $$;
 
-revoke execute on function public.excluir_produto_precificacao(text, uuid) from public, anon, authenticated;
-grant execute on function public.excluir_produto_precificacao(text, uuid) to service_role;
+grant execute on function public.excluir_produto_precificacao(text, uuid) to anon;

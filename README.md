@@ -31,11 +31,18 @@ Localmente, use sempre o Supabase de **dev**, nunca o de produção. Na Vercel, 
 
 ## Banco de dados
 
-O schema completo está em `supabase/schema.sql` e é idempotente: pode ser executado de novo sem perder dados. Para alterar o schema:
+As mudanças de schema são feitas por migrations da [Supabase CLI](https://supabase.com/docs/guides/local-development/cli/getting-started), em `supabase/migrations/`. O `supabase/schema.sql` é uma cópia de referência do schema completo.
 
-1. Edite `supabase/schema.sql`.
-2. Execute no SQL Editor do projeto de **dev** e teste.
-3. Depois de validado, execute no projeto de produção.
+Primeira vez: `npx supabase login` e `npx supabase link --project-ref <id do projeto de dev>`.
+
+Para alterar o schema:
+
+1. `npx supabase migration new nome_da_mudanca` e escreva o SQL no arquivo criado.
+2. Com a CLI ligada ao **dev**, rode `npx supabase db push` e teste.
+3. Depois de validado, ligue a CLI à produção, rode `npx supabase db push` e volte o link para o dev.
+4. Atualize `supabase/schema.sql`.
+
+`npx supabase migration list` mostra quais migrations já foram aplicadas no banco ligado.
 
 ## Scripts
 

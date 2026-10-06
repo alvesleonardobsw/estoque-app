@@ -23,7 +23,12 @@ Controle de estoque, clientes, pedidos e precificação. Next.js 16 (App Router)
 
 - Supabase **produção** (`lzcdamjvvcmmgulvrovy`): dados reais. Só leitura, salvo pedido explícito.
 - Supabase **dev** (`ydjukidzicerxjhlrutk`): usado por Preview e pelo `.env.local`. Teste mudanças de banco aqui primeiro.
-- Mudança de schema: edite `supabase/schema.sql`, aplique no dev, valide e só então em produção.
+- Mudança de schema é feita por migration (Supabase CLI, `npx supabase ...`). As migrations em `supabase/migrations/` são a fonte da verdade.
+  1. `npx supabase migration new <nome>` e escreva o SQL.
+  2. Aplique no dev (`npx supabase link --project-ref ydjukidzicerxjhlrutk` + `npx supabase db push`) e teste.
+  3. Com aprovação do usuário: link na produção (`lzcdamjvvcmmgulvrovy`), `db push` e volte o link para o dev.
+  4. Reflita a mudança em `supabase/schema.sql` (cópia de referência do schema completo).
+- O link padrão da CLI é o dev. Sempre confira `supabase/.temp/project-ref` antes de um `db push`.
 
 ## Convenções
 
