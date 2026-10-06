@@ -10,6 +10,7 @@ type ProdutoEdicao = {
   nome: string;
   sabor: "frango" | "carne" | "palmito" | "calabresa" | "camarao";
   preco: number;
+  preco_variavel: boolean;
   estoque_atual: number;
 };
 
@@ -28,6 +29,7 @@ export function ProdutoForm({
   const [state, formAction, isPending] = useActionState(salvarProduto, initialState);
   const emEdicao = Boolean(produtoEdicao);
   const [estoqueAtual, setEstoqueAtual] = useState<number>(produtoEdicao?.estoque_atual ?? 0);
+  const [precoVariavel, setPrecoVariavel] = useState(produtoEdicao?.preco_variavel ?? false);
 
   const chaveEdicao = `${produtoEdicao?.id ?? ""}:${produtoEdicao?.estoque_atual ?? 0}`;
   const [chaveAnterior, setChaveAnterior] = useState(chaveEdicao);
@@ -69,55 +71,76 @@ export function ProdutoForm({
           </select>
         </label>
 
-        <label className="flex flex-col gap-1 text-sm">
-          Preco (R$)
-          <input
-            name="preco"
-            type="number"
-            required
-            min="0"
-            step="0.01"
-            defaultValue={produtoEdicao?.preco ?? ""}
-            className="rounded-lg border border-black/15 bg-white px-3 py-2 outline-none ring-primary/40 focus:ring"
-            placeholder="0,00"
-          />
-        </label>
+        {!precoVariavel ? (
+          <label className="flex flex-col gap-1 text-sm">
+            Preco (R$)
+            <input
+              name="preco"
+              type="number"
+              required
+              min="0"
+              step="0.01"
+              defaultValue={produtoEdicao?.preco ?? ""}
+              className="rounded-lg border border-black/15 bg-white px-3 py-2 outline-none ring-primary/40 focus:ring"
+              placeholder="0,00"
+            />
+          </label>
+        ) : null}
       </div>
 
-      <label className="flex flex-col gap-1 text-sm md:max-w-xs">
-        {emEdicao ? "Estoque atual" : "Estoque inicial"}
-        <div className="flex items-center gap-2">
-          <input
-            name="estoque_atual"
-            type="number"
-            required
-            min="0"
-            step="1"
-            value={estoqueAtual}
-            onChange={(event) => setEstoqueAtual(Math.max(0, Number(event.target.value || 0)))}
-            className="w-20 rounded-lg border border-black/15 bg-white px-2 py-2 text-center outline-none ring-primary/40 focus:ring"
-            placeholder="0"
-          />
-          <button
-            type="button"
-            onClick={() => setEstoqueAtual((valor) => Math.max(0, valor - 1))}
-            className="min-w-10 rounded-md border border-black/20 px-3 py-2 text-sm"
-            aria-label="Diminuir estoque"
-            title="Diminuir estoque"
-          >
-            -
-          </button>
-          <button
-            type="button"
-            onClick={() => setEstoqueAtual((valor) => valor + 1)}
-            className="min-w-10 rounded-md border border-black/20 px-3 py-2 text-sm"
-            aria-label="Aumentar estoque"
-            title="Aumentar estoque"
-          >
-            +
-          </button>
-        </div>
+      <label className="flex items-start gap-2 text-sm">
+        <input
+          type="checkbox"
+          name="preco_variavel"
+          checked={precoVariavel}
+          onChange={(event) => setPrecoVariavel(event.target.checked)}
+          className="mt-1"
+        />
+        <span>
+          Preco definido no pedido
+          <span className="block text-xs text-foreground/70">
+            Para produtos como o empadao na travessa: o valor e informado em cada pedido e o
+            produto nao controla estoque.
+          </span>
+        </span>
       </label>
+
+      {!precoVariavel ? (
+        <label className="flex flex-col gap-1 text-sm md:max-w-xs">
+          {emEdicao ? "Estoque atual" : "Estoque inicial"}
+          <div className="flex items-center gap-2">
+            <input
+              name="estoque_atual"
+              type="number"
+              required
+              min="0"
+              step="1"
+              value={estoqueAtual}
+              onChange={(event) => setEstoqueAtual(Math.max(0, Number(event.target.value || 0)))}
+              className="w-20 rounded-lg border border-black/15 bg-white px-2 py-2 text-center outline-none ring-primary/40 focus:ring"
+              placeholder="0"
+            />
+            <button
+              type="button"
+              onClick={() => setEstoqueAtual((valor) => Math.max(0, valor - 1))}
+              className="min-w-10 rounded-md border border-black/20 px-3 py-2 text-sm"
+              aria-label="Diminuir estoque"
+              title="Diminuir estoque"
+            >
+              -
+            </button>
+            <button
+              type="button"
+              onClick={() => setEstoqueAtual((valor) => valor + 1)}
+              className="min-w-10 rounded-md border border-black/20 px-3 py-2 text-sm"
+              aria-label="Aumentar estoque"
+              title="Aumentar estoque"
+            >
+              +
+            </button>
+          </div>
+        </label>
+      ) : null}
 
       {state.message ? (
         <p

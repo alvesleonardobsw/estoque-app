@@ -85,6 +85,8 @@ async function carregarDashboard(tenantId: string) {
         .select("id, nome, estoque_atual")
         .eq("tenant_id", tenantId)
         .eq("ativo", true)
+        // Produtos sob encomenda (preco definido no pedido) nao controlam estoque.
+        .eq("preco_variavel", false)
         .order("estoque_atual", { ascending: true }),
       supabase
         .from("pedidos")

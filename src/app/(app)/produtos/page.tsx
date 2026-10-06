@@ -9,6 +9,7 @@ type Produto = {
   nome: string;
   sabor: "frango" | "carne" | "palmito" | "calabresa" | "camarao";
   preco: number;
+  preco_variavel: boolean;
   estoque_atual: number;
 };
 
@@ -20,7 +21,7 @@ async function listarProdutos(tenantId: string) {
   const supabase = getSupabaseClient();
   const { data, error } = await supabase
     .from("produtos")
-    .select("id, nome, sabor, preco, estoque_atual")
+    .select("id, nome, sabor, preco, preco_variavel, estoque_atual")
     .eq("tenant_id", tenantId)
     .eq("ativo", true)
     .order("created_at", { ascending: false });
@@ -106,7 +107,11 @@ export default async function ProdutosPage({ searchParams }: PageProps) {
   const mostrarFormulario = Boolean(produtoEdicao) || novo === "1";
   const produtosFiltrados = produtos.filter((produto) => {
     const matchSabor = !saborFiltro || obterSaborEfetivo(produto) === saborFiltro;
-    const matchPeso = !pesoFiltro || extrairPesoDoNome(produto.nome) === pesoFiltro;
+    const matchPeso =
+      !pesoFiltro ||
+      (pesoFiltro === "travessa"
+        ? produto.preco_variavel
+        : extrairPesoDoNome(produto.nome) === pesoFiltro);
     return matchSabor && matchPeso;
   });
 
@@ -197,9 +202,11 @@ export default async function ProdutosPage({ searchParams }: PageProps) {
             >
               <option value="">Todos</option>
               <option value="50g">50g</option>
+              <option value="200g">200g</option>
               <option value="350g">350g</option>
               <option value="500g">500g</option>
               <option value="1kg">1kg</option>
+              <option value="travessa">Travessa</option>
             </select>
           </label>
 
@@ -234,13 +241,17 @@ export default async function ProdutosPage({ searchParams }: PageProps) {
                 <tr
                   key={produto.id}
                   className={`border-b border-black/5 ${
-                    produto.estoque_atual === 0 ? "estoque-zero-row" : ""
+                    produto.estoque_atual === 0 && !produto.preco_variavel ? "estoque-zero-row" : ""
                   }`}
                 >
                   <td className="px-2 py-2">{produto.nome}</td>
                   <td className="px-2 py-2 capitalize">{obterSaborEfetivo(produto)}</td>
-                  <td className="px-2 py-2">{formatarPreco(produto.preco)}</td>
-                  <td className="px-2 py-2">{produto.estoque_atual}</td>
+                  <td className="px-2 py-2">
+                    {produto.preco_variavel ? "Definido no pedido" : formatarPreco(produto.preco)}
+                  </td>
+                  <td className="px-2 py-2">
+                    {produto.preco_variavel ? "Sob encomenda" : produto.estoque_atual}
+                  </td>
                   <td className="px-2 py-2">
                     <div className="flex gap-2">
                       <Link

@@ -16,6 +16,7 @@ type ProdutoOption = {
   nome: string;
   sabor: "frango" | "carne" | "palmito" | "calabresa" | "camarao";
   preco: number;
+  preco_variavel: boolean;
   estoque_atual: number;
 };
 
@@ -25,11 +26,14 @@ type ItemForm = {
   sabor: Sabor | "";
   produto_id: string;
   quantidade: number;
+  // Valor digitado para produtos com preco definido no pedido (ex.: travessa).
+  preco_unitario: string;
 };
 
 type PedidoEdicaoItem = {
   produto_id: string;
   quantidade: number;
+  preco_unitario: number;
 };
 
 type PedidoEdicao = {
@@ -61,6 +65,11 @@ function inferirSaborDoNome(nomeProduto: string): Sabor | "" {
   return "";
 }
 
+function lerValor(texto: string) {
+  const valor = Number(texto.replace(",", "."));
+  return Number.isFinite(valor) && valor > 0 ? valor : null;
+}
+
 function obterSaborProduto(produto: ProdutoOption): Sabor {
   const inferido = inferirSaborDoNome(produto.nome);
   if (produto.sabor !== "frango") return produto.sabor;
@@ -86,11 +95,13 @@ export function PedidoForm({
       ? pedidoEdicao.itens.map((item) => {
           const produto = produtos.find((produtoAtual) => produtoAtual.id === item.produto_id);
           return {
-            ...item,
+            produto_id: item.produto_id,
+            quantidade: item.quantidade,
+            preco_unitario: produto?.preco_variavel ? String(item.preco_unitario) : "",
             sabor: produto ? obterSaborProduto(produto) : "",
           };
         })
-      : [{ sabor: "", produto_id: "", quantidade: 1 }];
+      : [{ sabor: "", produto_id: "", quantidade: 1, preco_unitario: "" }];
   const [itens, setItens] = useState<ItemForm[]>(
     itensIniciais,
   );
@@ -101,14 +112,23 @@ export function PedidoForm({
   }, [produtos]);
 
   const itensValidos = useMemo(() => {
-    return itens.filter((item) => item.produto_id && item.quantidade > 0);
-  }, [itens]);
+    return itens
+      .filter((item) => item.produto_id && item.quantidade > 0)
+      .map((item) => ({
+        produto_id: item.produto_id,
+        quantidade: item.quantidade,
+        preco_unitario: produtosPorId.get(item.produto_id)?.preco_variavel
+          ? lerValor(item.preco_unitario)
+          : null,
+      }));
+  }, [itens, produtosPorId]);
 
   const totalEstimado = useMemo(() => {
     return itensValidos.reduce((acc, item) => {
       const produto = produtosPorId.get(item.produto_id);
       if (!produto) return acc;
-      return acc + produto.preco * item.quantidade;
+      const preco = produto.preco_variavel ? (item.preco_unitario ?? 0) : produto.preco;
+      return acc + preco * item.quantidade;
     }, 0);
   }, [itensValidos, produtosPorId]);
 
@@ -117,7 +137,7 @@ export function PedidoForm({
   }
 
   function adicionarItem() {
-    setItens((atual) => [...atual, { sabor: "", produto_id: "", quantidade: 1 }]);
+    setItens((atual) => [...atual, { sabor: "", produto_id: "", quantidade: 1, preco_unitario: "" }]);
   }
 
   function removerItem(index: number) {
@@ -209,7 +229,10 @@ export function PedidoForm({
                   <option value="">{item.sabor ? "Selecione" : "Escolha o sabor primeiro"}</option>
                   {produtosFiltrados.map((produtoItem) => (
                     <option key={produtoItem.id} value={produtoItem.id}>
-                      {produtoItem.nome} (estoque: {produtoItem.estoque_atual})
+                      {produtoItem.nome}{" "}
+                      {produtoItem.preco_variavel
+                        ? "(sob encomenda)"
+                        : `(estoque: ${produtoItem.estoque_atual})`}
                     </option>
                   ))}
                 </select>
@@ -276,7 +299,23 @@ export function PedidoForm({
                 </button>
               </div>
 
-              {produto ? (
+              {produto?.preco_variavel ? (
+                <label className="flex max-w-xs flex-col gap-1 text-sm md:col-span-4">
+                  Valor unitario (R$)
+                  <input
+                    type="number"
+                    min="0.01"
+                    step="0.01"
+                    required
+                    value={item.preco_unitario}
+                    onChange={(event) =>
+                      atualizarItem(index, { ...item, preco_unitario: event.target.value })
+                    }
+                    className="rounded-lg border border-black/15 bg-white px-3 py-2 outline-none ring-primary/40 focus:ring"
+                    placeholder="Peso liquido x preco/kg"
+                  />
+                </label>
+              ) : produto ? (
                 <p className="text-xs text-foreground/70 md:col-span-4">
                   Preco unitario:{" "}
                   {new Intl.NumberFormat("pt-BR", {

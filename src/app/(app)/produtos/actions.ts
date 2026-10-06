@@ -23,9 +23,11 @@ export async function salvarProduto(_: ActionState, formData: FormData): Promise
   const sabor = String(formData.get("sabor") ?? "").trim();
   const precoTexto = String(formData.get("preco") ?? "").replace(",", ".").trim();
   const estoqueTexto = String(formData.get("estoque_atual") ?? "").trim();
+  const precoVariavel = formData.get("preco_variavel") === "on";
 
-  const preco = Number(precoTexto);
-  const estoque = Number(estoqueTexto);
+  // Produto com preco definido no pedido (ex.: travessa) nao tem preco fixo nem estoque.
+  const preco = precoVariavel ? 0 : Number(precoTexto);
+  const estoque = precoVariavel ? 0 : Number(estoqueTexto);
 
   if (!nome) {
     return { ok: false, message: "O nome do produto e obrigatorio." };
@@ -51,6 +53,7 @@ export async function salvarProduto(_: ActionState, formData: FormData): Promise
           nome,
           sabor,
           preco,
+          preco_variavel: precoVariavel,
           estoque_atual: estoque,
         })
         .eq("id", id)
@@ -60,6 +63,7 @@ export async function salvarProduto(_: ActionState, formData: FormData): Promise
         nome,
         sabor,
         preco,
+        preco_variavel: precoVariavel,
         estoque_atual: estoque,
       });
 

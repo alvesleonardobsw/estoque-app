@@ -27,6 +27,7 @@ create table if not exists public.produtos (
   sabor text not null default 'frango',
   preco numeric(10, 2) not null check (preco >= 0),
   ativo boolean not null default true,
+  preco_variavel boolean not null default false,
   estoque_atual integer not null default 0,
   created_at timestamptz not null default now()
 );
@@ -36,6 +37,10 @@ alter table public.produtos
 
 alter table public.produtos
   add column if not exists sabor text;
+
+-- Preço definido em cada pedido (ex.: empadão na travessa); esses produtos não controlam estoque.
+alter table public.produtos
+  add column if not exists preco_variavel boolean not null default false;
 
 update public.produtos
 set sabor = 'frango'
@@ -203,6 +208,7 @@ declare
   v_produto_id uuid;
   v_quantidade integer;
   v_preco numeric(10, 2);
+  v_preco_variavel boolean;
   v_total numeric(12, 2) := 0;
 begin
   if p_tenant_id is null or btrim(p_tenant_id) = '' then
@@ -242,8 +248,8 @@ begin
       raise exception 'Item de pedido invalido.';
     end if;
 
-    select preco
-    into v_preco
+    select preco, preco_variavel
+    into v_preco, v_preco_variavel
     from public.produtos
     where id = v_produto_id
       and tenant_id = p_tenant_id
@@ -251,6 +257,13 @@ begin
 
     if not found then
       raise exception 'Produto nao encontrado.';
+    end if;
+
+    if v_preco_variavel then
+      v_preco := nullif(v_item ->> 'preco_unitario', '')::numeric(10, 2);
+      if v_preco is null or v_preco <= 0 then
+        raise exception 'Informe o valor dos itens com preco definido no pedido.';
+      end if;
     end if;
 
     insert into public.pedido_itens (
@@ -303,6 +316,7 @@ declare
   v_produto_id uuid;
   v_quantidade integer;
   v_preco numeric(10, 2);
+  v_preco_variavel boolean;
   v_total numeric(12, 2) := 0;
   v_item_antigo record;
   v_status_atual text;
@@ -352,10 +366,12 @@ begin
 
   if v_status_atual = 'entregue' then
     for v_item_antigo in
-      select produto_id, quantidade
-      from public.pedido_itens
-      where pedido_id = p_pedido_id
-        and tenant_id = p_tenant_id
+      select pi.produto_id, pi.quantidade
+      from public.pedido_itens pi
+      join public.produtos pr on pr.id = pi.produto_id
+      where pi.pedido_id = p_pedido_id
+        and pi.tenant_id = p_tenant_id
+        and not pr.preco_variavel
     loop
       update public.produtos
       set estoque_atual = estoque_atual + v_item_antigo.quantidade
@@ -395,8 +411,8 @@ begin
       raise exception 'Item de pedido invalido.';
     end if;
 
-    select preco
-    into v_preco
+    select preco, preco_variavel
+    into v_preco, v_preco_variavel
     from public.produtos
     where id = v_produto_id
       and tenant_id = p_tenant_id
@@ -404,6 +420,13 @@ begin
 
     if not found then
       raise exception 'Produto nao encontrado.';
+    end if;
+
+    if v_preco_variavel then
+      v_preco := nullif(v_item ->> 'preco_unitario', '')::numeric(10, 2);
+      if v_preco is null or v_preco <= 0 then
+        raise exception 'Informe o valor dos itens com preco definido no pedido.';
+      end if;
     end if;
 
     insert into public.pedido_itens (
@@ -428,10 +451,12 @@ begin
 
   if v_status_atual = 'entregue' then
     for v_item_antigo in
-      select produto_id, quantidade
-      from public.pedido_itens
-      where pedido_id = p_pedido_id
-        and tenant_id = p_tenant_id
+      select pi.produto_id, pi.quantidade
+      from public.pedido_itens pi
+      join public.produtos pr on pr.id = pi.produto_id
+      where pi.pedido_id = p_pedido_id
+        and pi.tenant_id = p_tenant_id
+        and not pr.preco_variavel
     loop
       update public.produtos
       set estoque_atual = estoque_atual - v_item_antigo.quantidade
@@ -508,10 +533,12 @@ begin
 
   if v_status_atual = 'entregue' then
     for v_item in
-      select produto_id, quantidade
-      from public.pedido_itens
-      where pedido_id = p_pedido_id
-        and tenant_id = p_tenant_id
+      select pi.produto_id, pi.quantidade
+      from public.pedido_itens pi
+      join public.produtos pr on pr.id = pi.produto_id
+      where pi.pedido_id = p_pedido_id
+        and pi.tenant_id = p_tenant_id
+        and not pr.preco_variavel
     loop
       update public.produtos
       set estoque_atual = estoque_atual + v_item.quantidade
@@ -627,10 +654,12 @@ begin
   if v_status_atual <> p_status then
     if v_status_atual = 'pendente' and p_status = 'entregue' then
       for v_item in
-        select produto_id, quantidade
-        from public.pedido_itens
-        where pedido_id = p_pedido_id
-          and tenant_id = p_tenant_id
+        select pi.produto_id, pi.quantidade
+        from public.pedido_itens pi
+        join public.produtos pr on pr.id = pi.produto_id
+        where pi.pedido_id = p_pedido_id
+          and pi.tenant_id = p_tenant_id
+          and not pr.preco_variavel
       loop
         update public.produtos
         set estoque_atual = estoque_atual - v_item.quantidade
@@ -656,10 +685,12 @@ begin
       end loop;
     elsif v_status_atual = 'entregue' and p_status = 'pendente' then
       for v_item in
-        select produto_id, quantidade
-        from public.pedido_itens
-        where pedido_id = p_pedido_id
-          and tenant_id = p_tenant_id
+        select pi.produto_id, pi.quantidade
+        from public.pedido_itens pi
+        join public.produtos pr on pr.id = pi.produto_id
+        where pi.pedido_id = p_pedido_id
+          and pi.tenant_id = p_tenant_id
+          and not pr.preco_variavel
       loop
         update public.produtos
         set estoque_atual = estoque_atual + v_item.quantidade

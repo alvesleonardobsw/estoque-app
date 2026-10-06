@@ -13,6 +13,7 @@ type ActionState = {
 type PedidoItemInput = {
   produto_id: string;
   quantidade: number;
+  preco_unitario: number | null;
 };
 
 export async function salvarPedido(_: ActionState, formData: FormData): Promise<ActionState> {
@@ -46,6 +47,11 @@ export async function salvarPedido(_: ActionState, formData: FormData): Promise<
       .map((item) => ({
         produto_id: String(item?.produto_id ?? "").trim(),
         quantidade: Number(item?.quantidade ?? 0),
+        // So usado em produtos com preco definido no pedido; o banco ignora nos demais.
+        preco_unitario:
+          item?.preco_unitario === null || item?.preco_unitario === undefined
+            ? null
+            : Number(item.preco_unitario),
       }))
       .filter((item) => item.produto_id && Number.isInteger(item.quantidade) && item.quantidade > 0);
   } catch {

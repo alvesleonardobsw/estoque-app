@@ -16,6 +16,7 @@ type Produto = {
   nome: string;
   sabor: "frango" | "carne" | "palmito" | "calabresa" | "camarao";
   preco: number;
+  preco_variavel: boolean;
   estoque_atual: number;
 };
 
@@ -35,6 +36,7 @@ type PedidoLista = {
     id: string;
     produto_id: string;
     quantidade: number;
+    preco_unitario: number;
     subtotal: number;
     produtos: {
       nome: string;
@@ -57,7 +59,7 @@ async function carregarDadosPedidos(tenantId: string, statusFiltro: "todos" | "p
   let pedidosQuery = supabase
     .from("pedidos")
     .select(
-      "id, cliente_id, status, data_entrega_prevista, data_entrega, total, created_at, clientes(id, nome), pedido_itens(id, produto_id, quantidade, subtotal, produtos(nome))",
+      "id, cliente_id, status, data_entrega_prevista, data_entrega, total, created_at, clientes(id, nome), pedido_itens(id, produto_id, quantidade, preco_unitario, subtotal, produtos(nome))",
     )
     .eq("tenant_id", tenantId)
     .order("created_at", { ascending: false })
@@ -71,7 +73,7 @@ async function carregarDadosPedidos(tenantId: string, statusFiltro: "todos" | "p
     supabase.from("clientes").select("id, nome").eq("tenant_id", tenantId).order("nome", { ascending: true }),
     supabase
       .from("produtos")
-      .select("id, nome, sabor, preco, estoque_atual")
+      .select("id, nome, sabor, preco, preco_variavel, estoque_atual")
       .eq("tenant_id", tenantId)
       .eq("ativo", true)
       .order("nome", { ascending: true }),
@@ -180,6 +182,7 @@ export default async function PedidosPage({ searchParams }: PageProps) {
                   itens: pedidoEdicao.pedido_itens.map((item) => ({
                     produto_id: item.produto_id,
                     quantidade: item.quantidade,
+                    preco_unitario: item.preco_unitario,
                   })),
                 }
               : null
