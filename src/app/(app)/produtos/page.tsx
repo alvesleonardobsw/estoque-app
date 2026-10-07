@@ -3,6 +3,7 @@ import { requireSession } from "@/lib/auth";
 import { ProdutoForm } from "./produto-form";
 import Link from "next/link";
 import { EditIcon } from "@/components/action-icons";
+import { CardapioEstoque } from "./cardapio-estoque";
 
 type Produto = {
   id: string;
@@ -122,14 +123,17 @@ export default async function ProdutosPage({ searchParams }: PageProps) {
         <p className="text-sm text-foreground/70">Cadastro</p>
         <h1 className="text-2xl font-semibold">Produtos</h1>
         </div>
-        {!mostrarFormulario ? (
-          <Link
-            href="/produtos?novo=1"
-            className="inline-block rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-contrast"
-          >
-            Cadastrar produto
-          </Link>
-        ) : null}
+        <div className="flex flex-wrap gap-2">
+          <CardapioEstoque />
+          {!mostrarFormulario ? (
+            <Link
+              href="/produtos?novo=1"
+              className="inline-block rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-contrast"
+            >
+              Cadastrar produto
+            </Link>
+          ) : null}
+        </div>
       </header>
 
       {!hasSupabaseEnv() ? (

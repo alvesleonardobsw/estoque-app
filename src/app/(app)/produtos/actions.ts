@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireSession } from "@/lib/auth";
 import { getSupabaseClient, hasSupabaseEnv } from "@/lib/supabase";
+import { montarBlocosCardapio, type BlocoCardapio } from "@/lib/cardapio";
 
 type ActionState = {
   ok: boolean;
@@ -120,4 +121,50 @@ export async function excluirProduto(formData: FormData) {
   revalidatePath("/pedidos");
   revalidatePath("/");
   redirect("/produtos?sucesso=excluido");
+}
+
+type CardapioResultado = { ok: true; blocos: BlocoCardapio[] } | { ok: false; message: string };
+
+// Estoque livre para divulgar: estoque atual menos o que ja esta em pedidos pendentes
+// (o estoque so e baixado na entrega). Produtos de preco variavel (travessa) ficam de fora.
+export async function carregarCardapioDisponivel(): Promise<CardapioResultado> {
+  if (!hasSupabaseEnv()) {
+    return { ok: false, message: "Configure o Supabase antes de gerar o cardapio." };
+  }
+
+  const sessao = await requireSession();
+  const supabase = getSupabaseClient();
+
+  const [produtosResp, reservadosResp] = await Promise.all([
+    supabase
+      .from("produtos")
+      .select("id, nome, estoque_atual")
+      .eq("tenant_id", sessao.tenantId)
+      .eq("ativo", true)
+      .eq("preco_variavel", false),
+    supabase
+      .from("pedido_itens")
+      .select("produto_id, quantidade, pedidos!inner(status)")
+      .eq("tenant_id", sessao.tenantId)
+      .eq("pedidos.status", "pendente"),
+  ]);
+
+  const erro = produtosResp.error?.message || reservadosResp.error?.message;
+  if (erro) {
+    return { ok: false, message: `Erro ao carregar o estoque: ${erro}` };
+  }
+
+  const reservados = new Map<string, number>();
+  for (const item of reservadosResp.data ?? []) {
+    reservados.set(item.produto_id, (reservados.get(item.produto_id) ?? 0) + item.quantidade);
+  }
+
+  const blocos = montarBlocosCardapio(
+    (produtosResp.data ?? []).map((produto) => ({
+      nome: produto.nome,
+      disponivel: produto.estoque_atual - (reservados.get(produto.id) ?? 0),
+    })),
+  );
+
+  return { ok: true, blocos };
 }
