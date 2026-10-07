@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireSession } from "@/lib/auth";
 import { getSupabaseClient, hasSupabaseEnv } from "@/lib/supabase";
+import { ehFormaPagamento } from "@/lib/forma-pagamento";
 
 type ActionState = {
   ok: boolean;
@@ -143,4 +144,23 @@ export async function atualizarStatusPedido(formData: FormData) {
 
   revalidatePath("/pedidos");
   revalidatePath("/");
+}
+
+export async function atualizarFormaPagamentoPedido(formData: FormData) {
+  if (!hasSupabaseEnv()) return;
+  const sessao = await requireSession();
+
+  const pedidoId = String(formData.get("pedido_id") ?? "").trim();
+  const formaPagamento = String(formData.get("forma_pagamento") ?? "").trim();
+  if (!pedidoId) return;
+  if (formaPagamento && !ehFormaPagamento(formaPagamento)) return;
+
+  const supabase = getSupabaseClient();
+  await supabase.rpc("atualizar_forma_pagamento_pedido", {
+    p_tenant_id: sessao.tenantId,
+    p_pedido_id: pedidoId,
+    p_forma_pagamento: formaPagamento || null,
+  });
+
+  revalidatePath("/pedidos");
 }

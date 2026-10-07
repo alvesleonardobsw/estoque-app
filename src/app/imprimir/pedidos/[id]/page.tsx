@@ -1,12 +1,14 @@
 import { getSupabaseClient, hasSupabaseEnv } from "@/lib/supabase";
 import { requireSession } from "@/lib/auth";
 import { PrintControls } from "./print-controls";
+import { rotuloFormaPagamento } from "@/lib/forma-pagamento";
 
 type PedidoDetalhe = {
   id: string;
   created_at: string;
   data_entrega_prevista: string | null;
   data_entrega: string | null;
+  forma_pagamento: string | null;
   total: number;
   clientes: { nome: string; endereco: string | null } | { nome: string; endereco: string | null }[] | null;
   pedido_itens: {
@@ -76,7 +78,7 @@ export default async function ImprimirPedidoPage({ params }: PageProps) {
   const { data, error } = await supabase
     .from("pedidos")
     .select(
-      "id, created_at, data_entrega_prevista, data_entrega, total, clientes(nome, endereco), pedido_itens(id, quantidade, subtotal, produtos(nome))",
+      "id, created_at, data_entrega_prevista, data_entrega, forma_pagamento, total, clientes(nome, endereco), pedido_itens(id, quantidade, subtotal, produtos(nome))",
     )
     .eq("tenant_id", sessao.tenantId)
     .eq("id", id)
@@ -151,6 +153,9 @@ export default async function ImprimirPedidoPage({ params }: PageProps) {
         <p className="flex items-center justify-between text-base font-bold">
           <span>Total</span>
           <span>{formatarMoeda(pedido.total)}</span>
+        </p>
+        <p className="mt-1">
+          <strong>Pagamento:</strong> {rotuloFormaPagamento(pedido.forma_pagamento) || "Nao informado"}
         </p>
       </section>
     </main>

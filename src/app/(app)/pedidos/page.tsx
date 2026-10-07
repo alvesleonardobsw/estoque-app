@@ -4,7 +4,9 @@ import { PedidoForm } from "./pedido-form";
 import { atualizarStatusPedido, excluirPedido } from "./actions";
 import Link from "next/link";
 import { ConfirmDeletePedidoButton } from "./confirm-delete-button";
+import { FormaPagamentoButton } from "./forma-pagamento-button";
 import { CheckCircleIcon, EditIcon, PrintIcon, UndoIcon } from "@/components/action-icons";
+import { rotuloFormaPagamento } from "@/lib/forma-pagamento";
 
 type Cliente = {
   id: string;
@@ -26,6 +28,7 @@ type PedidoLista = {
   status: "pendente" | "entregue";
   data_entrega_prevista: string | null;
   data_entrega: string | null;
+  forma_pagamento: string | null;
   total: number;
   created_at: string;
   clientes: {
@@ -59,7 +62,7 @@ async function carregarDadosPedidos(tenantId: string, statusFiltro: "todos" | "p
   let pedidosQuery = supabase
     .from("pedidos")
     .select(
-      "id, cliente_id, status, data_entrega_prevista, data_entrega, total, created_at, clientes(id, nome), pedido_itens(id, produto_id, quantidade, preco_unitario, subtotal, produtos(nome))",
+      "id, cliente_id, status, data_entrega_prevista, data_entrega, forma_pagamento, total, created_at, clientes(id, nome), pedido_itens(id, produto_id, quantidade, preco_unitario, subtotal, produtos(nome))",
     )
     .eq("tenant_id", tenantId)
     .order("created_at", { ascending: false })
@@ -248,6 +251,11 @@ export default async function PedidosPage({ searchParams }: PageProps) {
                 <p className="mt-1 text-sm">
                   Total: <span className="font-semibold text-primary">{formatarMoeda(pedido.total)}</span>
                 </p>
+                {pedido.forma_pagamento ? (
+                  <p className="mt-1 text-xs text-foreground/70">
+                    Pagamento: {rotuloFormaPagamento(pedido.forma_pagamento)}
+                  </p>
+                ) : null}
                 {pedido.data_entrega_prevista ? (
                   <p className="mt-1 text-xs text-foreground/70">
                     Entrega prevista: {formatarDataCurta(pedido.data_entrega_prevista)}
@@ -297,6 +305,7 @@ export default async function PedidosPage({ searchParams }: PageProps) {
                     >
                       <EditIcon />
                     </Link>
+                    <FormaPagamentoButton pedidoId={pedido.id} formaPagamento={pedido.forma_pagamento} />
                     <form id={`excluir-pedido-${pedido.id}`} action={excluirPedido}>
                       <input type="hidden" name="pedido_id" value={pedido.id} />
                     </form>
