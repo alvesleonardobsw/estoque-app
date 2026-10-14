@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { requireSession } from "@/lib/auth";
-import { getSupabaseClient, hasSupabaseEnv } from "@/lib/supabase";
+import { getSupabaseClient, hasSupabaseEnv, mensagemErro } from "@/lib/supabase";
 import { PrecificacaoForm } from "./precificacao-form";
 import { excluirIngredienteBasePrecificacao, excluirProdutoPrecificacao, salvarCustoBasePrecificacao } from "./actions";
 import { EditIcon, TrashIcon } from "@/components/action-icons";
@@ -61,7 +61,7 @@ async function carregarDados(tenantId: string) {
   return {
     produtos: (produtosResp.data ?? []) as ProdutoPrecificacao[],
     base: (baseResp.data ?? []) as ItemBase[],
-    erro: produtosResp.error?.message || baseResp.error?.message || "",
+    erro: mensagemErro(produtosResp.error, baseResp.error),
   };
 }
 

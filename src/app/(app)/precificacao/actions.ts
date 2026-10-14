@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireSession } from "@/lib/auth";
-import { getSupabaseClient, hasSupabaseEnv } from "@/lib/supabase";
+import { getSupabaseClient, hasSupabaseEnv, mensagemErro } from "@/lib/supabase";
 
 type ActionState = {
   ok: boolean;
@@ -110,7 +110,7 @@ export async function salvarProdutoPrecificacao(
   });
 
   if (error) {
-    return { ok: false, message: `Erro ao salvar precificacao: ${error.message}` };
+    return { ok: false, message: `Erro ao salvar precificacao: ${mensagemErro(error)}` };
   }
 
   revalidatePath("/precificacao");

@@ -1,4 +1,4 @@
-import { getSupabaseClient, hasSupabaseEnv } from "@/lib/supabase";
+import { getSupabaseClient, hasSupabaseEnv, mensagemErro } from "@/lib/supabase";
 import { requireSession } from "@/lib/auth";
 import { PedidoForm } from "./pedido-form";
 import { atualizarStatusPedido, excluirPedido } from "./actions";
@@ -83,8 +83,7 @@ async function carregarDadosPedidos(tenantId: string, statusFiltro: "todos" | "p
     pedidosQuery,
   ]);
 
-  const erro =
-    clientesResp.error?.message || produtosResp.error?.message || pedidosResp.error?.message || "";
+  const erro = mensagemErro(clientesResp.error, produtosResp.error, pedidosResp.error);
 
   return {
     clientes: (clientesResp.data ?? []) as Cliente[],
@@ -166,8 +165,7 @@ export default async function PedidosPage({ searchParams }: PageProps) {
 
       {erro ? (
         <article className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
-          Nao foi possivel carregar pedidos: {erro}. Execute o SQL de
-          `supabase/schema.sql` no Supabase e recarregue a pagina.
+          Nao foi possivel carregar pedidos: {erro}
         </article>
       ) : null}
 

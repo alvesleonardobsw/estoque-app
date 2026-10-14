@@ -1,5 +1,5 @@
 import { ClienteForm } from "./cliente-form";
-import { getSupabaseClient, hasSupabaseEnv } from "@/lib/supabase";
+import { getSupabaseClient, hasSupabaseEnv, mensagemErro } from "@/lib/supabase";
 import { requireSession } from "@/lib/auth";
 import Link from "next/link";
 import { EditIcon, MapPinIcon } from "@/components/action-icons";
@@ -24,7 +24,7 @@ async function listarClientes(tenantId: string) {
     .order("created_at", { ascending: false });
 
   if (error) {
-    return { clientes: [] as Cliente[], erro: error.message };
+    return { clientes: [] as Cliente[], erro: mensagemErro(error) };
   }
 
   return { clientes: (data ?? []) as Cliente[], erro: "" };
@@ -92,8 +92,7 @@ export default async function ClientesPage({ searchParams }: PageProps) {
 
       {erro ? (
         <article className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
-          Nao foi possivel carregar clientes ainda: {erro}. Execute o SQL de
-          `supabase/schema.sql` no Supabase e recarregue a pagina.
+          Nao foi possivel carregar clientes ainda: {erro}
         </article>
       ) : null}
 

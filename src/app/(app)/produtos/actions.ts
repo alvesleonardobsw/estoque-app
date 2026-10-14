@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireSession } from "@/lib/auth";
-import { getSupabaseClient, hasSupabaseEnv } from "@/lib/supabase";
+import { getSupabaseClient, hasSupabaseEnv, mensagemErro } from "@/lib/supabase";
 import { montarBlocosCardapio, type BlocoCardapio } from "@/lib/cardapio";
 
 type ActionState = {
@@ -69,7 +69,7 @@ export async function salvarProduto(_: ActionState, formData: FormData): Promise
       });
 
   if (error) {
-    return { ok: false, message: `Erro ao salvar produto: ${error.message}` };
+    return { ok: false, message: `Erro ao salvar produto: ${mensagemErro(error)}` };
   }
 
   revalidatePath("/produtos");
@@ -149,7 +149,7 @@ export async function carregarCardapioDisponivel(): Promise<CardapioResultado> {
       .eq("pedidos.status", "pendente"),
   ]);
 
-  const erro = produtosResp.error?.message || reservadosResp.error?.message;
+  const erro = mensagemErro(produtosResp.error, reservadosResp.error);
   if (erro) {
     return { ok: false, message: `Erro ao carregar o estoque: ${erro}` };
   }

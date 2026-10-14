@@ -1,4 +1,4 @@
-import { getSupabaseClient, hasSupabaseEnv } from "@/lib/supabase";
+import { getSupabaseClient, hasSupabaseEnv, mensagemErro } from "@/lib/supabase";
 import { requireSession } from "@/lib/auth";
 import { ProdutoForm } from "./produto-form";
 import Link from "next/link";
@@ -28,7 +28,7 @@ async function listarProdutos(tenantId: string) {
     .order("created_at", { ascending: false });
 
   if (error) {
-    return { produtos: [] as Produto[], erro: error.message };
+    return { produtos: [] as Produto[], erro: mensagemErro(error) };
   }
 
   return { produtos: (data ?? []) as Produto[], erro: "" };
@@ -154,8 +154,7 @@ export default async function ProdutosPage({ searchParams }: PageProps) {
 
       {erro ? (
         <article className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
-          Nao foi possivel carregar produtos ainda: {erro}. Execute o SQL de
-          `supabase/schema.sql` no Supabase e recarregue a pagina.
+          Nao foi possivel carregar produtos ainda: {erro}
         </article>
       ) : null}
 

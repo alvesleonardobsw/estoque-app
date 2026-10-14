@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireSession } from "@/lib/auth";
-import { getSupabaseClient, hasSupabaseEnv } from "@/lib/supabase";
+import { getSupabaseClient, hasSupabaseEnv, mensagemErro } from "@/lib/supabase";
 import { ehFormaPagamento } from "@/lib/forma-pagamento";
 
 type ActionState = {
@@ -78,7 +78,7 @@ export async function salvarPedido(_: ActionState, formData: FormData): Promise<
       });
 
   if (error) {
-    return { ok: false, message: `Erro ao salvar pedido: ${error.message}` };
+    return { ok: false, message: `Erro ao salvar pedido: ${mensagemErro(error)}` };
   }
 
   const pedidoPersistidoId = pedidoId || (typeof data === "string" ? data : "");
@@ -92,7 +92,7 @@ export async function salvarPedido(_: ActionState, formData: FormData): Promise<
     if (erroDataEntrega) {
       return {
         ok: false,
-        message: `Pedido salvo, mas falhou ao salvar data de entrega: ${erroDataEntrega.message}`,
+        message: `Pedido salvo, mas falhou ao salvar data de entrega: ${mensagemErro(erroDataEntrega)}`,
       };
     }
   }

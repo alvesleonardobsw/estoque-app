@@ -1,4 +1,4 @@
-import { getSupabaseClient, hasSupabaseEnv } from "@/lib/supabase";
+import { getSupabaseClient, hasSupabaseEnv, mensagemErro } from "@/lib/supabase";
 import { requireSession } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
@@ -111,15 +111,15 @@ async function carregarDashboard(tenantId: string) {
         .eq("status", "pendente"),
     ]);
 
-  const erro =
-    clientesResp.error?.message ||
-    produtosCountResp.error?.message ||
-    produtosResp.error?.message ||
-    pedidosHojeResp.error?.message ||
-    pedidosMesResp.error?.message ||
-    pedidosResp.error?.message ||
-    pedidosPendentesResp.error?.message ||
-    "";
+  const erro = mensagemErro(
+    clientesResp.error,
+    produtosCountResp.error,
+    produtosResp.error,
+    pedidosHojeResp.error,
+    pedidosMesResp.error,
+    pedidosResp.error,
+    pedidosPendentesResp.error,
+  );
 
   const produtos = (produtosResp.data ?? []) as ProdutoEstoque[];
   const pedidosHoje = pedidosHojeResp.data ?? [];
@@ -164,8 +164,7 @@ export default async function DashboardPage() {
 
       {dados.erro ? (
         <article className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
-          Nao foi possivel carregar os indicadores: {dados.erro}. Confira se o SQL de
-          `supabase/schema.sql` foi executado.
+          Nao foi possivel carregar os indicadores: {dados.erro}
         </article>
       ) : null}
 
