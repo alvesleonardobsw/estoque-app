@@ -8,7 +8,7 @@ export const PREFIXO_TENANT = "vitest-";
 // Tabelas na ordem em que podem ser apagadas (movimentos referenciam produtos sem cascade).
 const TABELAS_DO_TENANT = ["estoque_movimentos", "pedido_itens", "pedidos", "produtos", "clientes"];
 
-function urlDoBancoDev() {
+export function urlDoBancoDev() {
   const url = process.env.SUPABASE_URL ?? "";
   if (URL.parse(url)?.hostname !== `${PROJETO_DEV}.supabase.co`) {
     throw new Error(

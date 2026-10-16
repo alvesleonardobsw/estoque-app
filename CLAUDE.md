@@ -12,6 +12,7 @@ Controle de estoque, clientes, pedidos e precificação. Next.js 16 (App Router)
 - `npm test` — testes (Vitest); `npm run test:watch` para rodar enquanto edita
 - `npm run build` — roda os testes e depois o build de produção (teste falhando barra o deploy na Vercel)
 - `npm run test:db` — testes das funções SQL contra o Supabase **dev** (fora do build)
+- `npm run test:e2e` — testes de tela (Playwright) num `next dev` próprio na porta 3100, contra o Supabase **dev** (fora do build)
 
 ## Arquitetura
 
@@ -36,13 +37,13 @@ Controle de estoque, clientes, pedidos e precificação. Next.js 16 (App Router)
 
 - Vitest, ambiente Node, sempre em UTC (como a Vercel). Testes ficam ao lado do código: `src/lib/x.ts` → `src/lib/x.test.ts`.
 - Lógica testável vai para funções puras em `src/lib/`; `page.tsx` e `actions.ts` só buscam dados e chamam essas funções. Se a lógica de um bug está presa numa página ou action, extraia para `src/lib/` antes de testar.
-- Os testes não acessam o Supabase nem a rede. Use `vi.mock` para `next/headers`, `next/navigation` etc. (veja `src/lib/auth.test.ts`).
+- Os testes unitários não acessam o Supabase nem a rede. Use `vi.mock` para `next/headers`, `next/navigation` etc. (veja `src/lib/auth.test.ts`).
 - **Todo bug corrigido (`fix(...)`) vem com teste de regressão no mesmo commit:**
   1. Escreva primeiro o teste que reproduz o bug e confirme que ele **falha** com o código antigo.
   2. Corrija e confirme que passa (`npm test`).
   3. Nomeie o caso `regressao: <comportamento esperado>` e coloque acima um comentário com o escopo do commit e o que acontecia, ex.: `// Regressao: fix(produtos). Filtro de sabor + peso trazia produtos de outros pesos.`
-- Se o bug estiver numa função SQL, trigger ou permissão do banco, a regressão vai em `tests/db/` (abaixo).
-- Se não for testável nem assim (comportamento de tela), diga isso no commit e explique como foi verificado.
+- Onde vai a regressão: lógica pura → `src/lib/*.test.ts`; função SQL, trigger ou permissão do banco → `tests/db/`; comportamento de tela (formulário, navegação, o que aparece na página) → `tests/e2e/`. Prefira a camada mais barata que reproduz o bug.
+- Confirme que o teste falha com o bug de volta: um teste que passa com e sem a correção não protege nada.
 
 ### Testes de banco (`tests/db/`)
 
@@ -50,6 +51,17 @@ Controle de estoque, clientes, pedidos e precificação. Next.js 16 (App Router)
 - Precisam de `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` e `SUPABASE_ANON_KEY` (chave publishable do dev) no `.env.local`.
 - Cada arquivo cria seus dados num tenant `vitest-<uuid>` (`novoTenant()`) e apaga no `afterAll`; o `global-setup.ts` limpa qualquer tenant `vitest-%` antes e depois da suíte. Use os helpers de `tests/db/helpers.ts`.
 - Mudou função SQL ou migration? Aplique no dev e rode `npm run test:db` antes de levar para a produção.
+
+### Testes de tela (`tests/e2e/`)
+
+- `npm run test:e2e` sobe um `next dev` na porta 3100 com `NEXT_DIST_DIR=.next-e2e` (não disputa a `.next` com o `npm run dev`).
+- A cada execução o `playwright.config.ts` gera uma conta de login (`E2E_USUARIO`/`E2E_SENHA`) e um tenant `vitest-e2e-<uuid>` só para os testes; não usa as contas reais. Os dados são criados com os helpers de `tests/db/helpers.ts` e apagados no `afterAll`.
+- Os `<select>` do app não têm nome acessível estável (o nome inclui a opção escolhida); localize pelo `<label>` em volta (`campo(page, "Produto")`) ou pelo `name`.
+- Primeira vez na máquina: `npx playwright install chromium`.
+
+### CI (GitHub Actions)
+
+- `.github/workflows/testes.yml` roda a cada push na `main` e em PR: lint, tipos e unitários; e, se os segredos `SUPABASE_DEV_URL`, `SUPABASE_DEV_SERVICE_ROLE_KEY` e `SUPABASE_DEV_ANON_KEY` estiverem configurados no GitHub, `test:db` e `test:e2e` contra o dev.
 
 ## Convenções
 

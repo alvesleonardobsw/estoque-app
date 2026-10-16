@@ -1,0 +1,69 @@
+name: Testes
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  unitarios:
+    name: Lint, tipos e testes unitarios
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npx tsc --noEmit
+      - run: npm test
+
+  banco-e-telas:
+    name: Testes de banco e de tela (Supabase dev)
+    runs-on: ubuntu-latest
+    # Os dois jobs limpam os tenants vitest-% no banco dev; um de cada vez.
+    concurrency:
+      group: supabase-dev
+      cancel-in-progress: false
+    env:
+      # Segredos do projeto DEV (Settings > Secrets and variables > Actions).
+      # Sem eles o job so avisa e termina, sem falhar.
+      SUPABASE_URL: ${{ secrets.SUPABASE_DEV_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_DEV_SERVICE_ROLE_KEY }}
+      SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_DEV_ANON_KEY }}
+    steps:
+      - name: Conferir segredos
+        id: segredos
+        run: |
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_SERVICE_ROLE_KEY" ] || [ -z "$SUPABASE_ANON_KEY" ]; then
+            echo "::warning::Segredos SUPABASE_DEV_* nao configurados; testes de banco e de tela nao rodaram."
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          fi
+      - if: steps.segredos.outputs.ok == 'true'
+        uses: actions/checkout@v4
+      - if: steps.segredos.outputs.ok == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - if: steps.segredos.outputs.ok == 'true'
+        run: npm ci
+      - if: steps.segredos.outputs.ok == 'true'
+        name: Testes de banco
+        run: npm run test:db
+      - if: steps.segredos.outputs.ok == 'true'
+        run: npx playwright install --with-deps chromium
+      - if: steps.segredos.outputs.ok == 'true'
+        name: Testes de tela
+        run: npm run test:e2e
+      - if: failure() && steps.segredos.outputs.ok == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-traces
+          path: test-results/
+          retention-days: 7
