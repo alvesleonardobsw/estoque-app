@@ -11,6 +11,7 @@ Controle de estoque, clientes, pedidos e precificação. Next.js 16 (App Router)
 - `npx tsc --noEmit` — checagem de tipos
 - `npm test` — testes (Vitest); `npm run test:watch` para rodar enquanto edita
 - `npm run build` — roda os testes e depois o build de produção (teste falhando barra o deploy na Vercel)
+- `npm run test:db` — testes das funções SQL contra o Supabase **dev** (fora do build)
 
 ## Arquitetura
 
@@ -40,7 +41,15 @@ Controle de estoque, clientes, pedidos e precificação. Next.js 16 (App Router)
   1. Escreva primeiro o teste que reproduz o bug e confirme que ele **falha** com o código antigo.
   2. Corrija e confirme que passa (`npm test`).
   3. Nomeie o caso `regressao: <comportamento esperado>` e coloque acima um comentário com o escopo do commit e o que acontecia, ex.: `// Regressao: fix(produtos). Filtro de sabor + peso trazia produtos de outros pesos.`
-- Se o bug não for testável em unitário (comportamento de tela, função SQL), diga isso no commit e explique como foi verificado.
+- Se o bug estiver numa função SQL, trigger ou permissão do banco, a regressão vai em `tests/db/` (abaixo).
+- Se não for testável nem assim (comportamento de tela), diga isso no commit e explique como foi verificado.
+
+### Testes de banco (`tests/db/`)
+
+- Rodam com `npm run test:db` contra o Supabase **dev**; a suíte se recusa a rodar se `SUPABASE_URL` não for o projeto dev. Nunca aponte para a produção.
+- Precisam de `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` e `SUPABASE_ANON_KEY` (chave publishable do dev) no `.env.local`.
+- Cada arquivo cria seus dados num tenant `vitest-<uuid>` (`novoTenant()`) e apaga no `afterAll`; o `global-setup.ts` limpa qualquer tenant `vitest-%` antes e depois da suíte. Use os helpers de `tests/db/helpers.ts`.
+- Mudou função SQL ou migration? Aplique no dev e rode `npm run test:db` antes de levar para a produção.
 
 ## Convenções
 
