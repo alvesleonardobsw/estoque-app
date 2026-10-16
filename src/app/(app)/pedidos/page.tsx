@@ -7,6 +7,7 @@ import { ConfirmDeletePedidoButton } from "./confirm-delete-button";
 import { FormaPagamentoButton } from "./forma-pagamento-button";
 import { CheckCircleIcon, EditIcon, PrintIcon, UndoIcon } from "@/components/action-icons";
 import { rotuloFormaPagamento } from "@/lib/forma-pagamento";
+import { formatarNumeroPedido } from "@/lib/numero-pedido";
 
 type Cliente = {
   id: string;
@@ -24,6 +25,7 @@ type Produto = {
 
 type PedidoLista = {
   id: string;
+  numero: number;
   cliente_id: string;
   status: "pendente" | "entregue";
   data_entrega_prevista: string | null;
@@ -62,7 +64,7 @@ async function carregarDadosPedidos(tenantId: string, statusFiltro: "todos" | "p
   let pedidosQuery = supabase
     .from("pedidos")
     .select(
-      "id, cliente_id, status, data_entrega_prevista, data_entrega, forma_pagamento, total, created_at, clientes(id, nome), pedido_itens(id, produto_id, quantidade, preco_unitario, subtotal, produtos(nome))",
+      "id, numero, cliente_id, status, data_entrega_prevista, data_entrega, forma_pagamento, total, created_at, clientes(id, nome), pedido_itens(id, produto_id, quantidade, preco_unitario, subtotal, produtos(nome))",
     )
     .eq("tenant_id", tenantId)
     .order("created_at", { ascending: false })
@@ -231,7 +233,8 @@ export default async function PedidosPage({ searchParams }: PageProps) {
               <div key={pedido.id} className="rounded-lg border border-black/10 p-3">
                 <div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
                   <p className="text-sm font-medium">
-                    Cliente: {extrairNomeRelacao(pedido.clientes, "Cliente nao encontrado")}
+                    <span className="text-foreground/70">#{formatarNumeroPedido(pedido.numero)}</span> · Cliente:{" "}
+                    {extrairNomeRelacao(pedido.clientes, "Cliente nao encontrado")}
                   </p>
                   <p className="text-sm text-foreground/70">{formatarData(pedido.created_at)}</p>
                 </div>

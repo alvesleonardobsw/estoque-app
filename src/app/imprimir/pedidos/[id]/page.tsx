@@ -2,9 +2,11 @@ import { getSupabaseClient, hasSupabaseEnv } from "@/lib/supabase";
 import { requireSession } from "@/lib/auth";
 import { PrintControls } from "./print-controls";
 import { rotuloFormaPagamento } from "@/lib/forma-pagamento";
+import { formatarNumeroPedido } from "@/lib/numero-pedido";
 
 type PedidoDetalhe = {
   id: string;
+  numero: number;
   created_at: string;
   data_entrega_prevista: string | null;
   data_entrega: string | null;
@@ -78,7 +80,7 @@ export default async function ImprimirPedidoPage({ params }: PageProps) {
   const { data, error } = await supabase
     .from("pedidos")
     .select(
-      "id, created_at, data_entrega_prevista, data_entrega, forma_pagamento, total, clientes(nome, endereco), pedido_itens(id, quantidade, subtotal, produtos(nome))",
+      "id, numero, created_at, data_entrega_prevista, data_entrega, forma_pagamento, total, clientes(nome, endereco), pedido_itens(id, quantidade, subtotal, produtos(nome))",
     )
     .eq("tenant_id", sessao.tenantId)
     .eq("id", id)
@@ -90,7 +92,7 @@ export default async function ImprimirPedidoPage({ params }: PageProps) {
 
   const pedido = data as PedidoDetalhe;
   const nomeCliente = extrairNomeRelacao(pedido.clientes, "Nao informado");
-  const codigoPedido = pedido.id.slice(0, 8).toUpperCase();
+  const codigoPedido = formatarNumeroPedido(pedido.numero);
   const nomeArquivo = `comanda-${nomeCliente
     .normalize("NFD")
     .replace(/[̀-ͯ]/g, "")
