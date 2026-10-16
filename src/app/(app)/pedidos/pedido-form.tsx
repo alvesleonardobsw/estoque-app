@@ -5,6 +5,7 @@ import { useActionState } from "react";
 import Link from "next/link";
 import { salvarPedido } from "./actions";
 import { TrashIcon } from "@/components/action-icons";
+import { faltasNoPedido, type Disponibilidade, type FaltaNoPedido } from "@/lib/estoque";
 
 type ClienteOption = {
   id: string;
@@ -70,6 +71,13 @@ function lerValor(texto: string) {
   return Number.isFinite(valor) && valor > 0 ? valor : null;
 }
 
+function descreverFalta(falta: FaltaNoPedido) {
+  if (falta.reservado === 0) {
+    return `So tem ${falta.disponivel} em estoque. Faltam ${falta.falta}.`;
+  }
+  return `So tem ${falta.disponivel} livre(s): ${Math.max(0, falta.estoque)} em estoque, ${falta.reservado} ja reservado(s) em outros pedidos pendentes. Faltam ${falta.falta}.`;
+}
+
 function obterSaborProduto(produto: ProdutoOption): Sabor {
   const inferido = inferirSaborDoNome(produto.nome);
   if (produto.sabor !== "frango") return produto.sabor;
@@ -80,11 +88,14 @@ function obterSaborProduto(produto: ProdutoOption): Sabor {
 export function PedidoForm({
   clientes,
   produtos,
+  disponibilidade,
   pedidoEdicao,
   mostrarCancelarNovo,
 }: {
   clientes: ClienteOption[];
   produtos: ProdutoOption[];
+  // Estoque e reserva de outros pendentes por produto, so para os que controlam estoque.
+  disponibilidade: Record<string, Disponibilidade>;
   pedidoEdicao: PedidoEdicao | null;
   mostrarCancelarNovo: boolean;
 }) {
@@ -133,6 +144,11 @@ export function PedidoForm({
           : null,
       }));
   }, [itens, produtosPorId]);
+
+  const faltas = useMemo(
+    () => faltasNoPedido(itensValidos, disponibilidade),
+    [itensValidos, disponibilidade],
+  );
 
   const totalEstimado = useMemo(() => {
     return itensValidos.reduce((acc, item) => {
@@ -193,6 +209,7 @@ export function PedidoForm({
 
         {itens.map((item, index) => {
           const produto = produtosPorId.get(item.produto_id);
+          const falta = faltas.get(item.produto_id);
           const produtosFiltrados = produtos.filter(
             (produtoItem) => obterSaborProduto(produtoItem) === item.sabor,
           );
@@ -335,6 +352,12 @@ export function PedidoForm({
                   }).format(produto.preco)}
                 </p>
               ) : null}
+
+              {falta ? (
+                <p className="rounded-md bg-amber-50 px-2 py-1 text-xs text-amber-900 md:col-span-4">
+                  {descreverFalta(falta)}
+                </p>
+              ) : null}
             </div>
           );
         })}
@@ -359,6 +382,12 @@ export function PedidoForm({
           }).format(totalEstimado)}
         </span>
       </p>
+
+      {faltas.size > 0 ? (
+        <p className="w-fit rounded-md bg-amber-50 px-2 py-1 text-xs text-amber-900">
+          Ha itens sem estoque suficiente. O pedido pode ser salvo mesmo assim (encomenda).
+        </p>
+      ) : null}
 
       {state.message ? (
         <p

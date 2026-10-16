@@ -9,6 +9,14 @@ import { CheckCircleIcon, EditIcon, PrintIcon, UndoIcon } from "@/components/act
 import { rotuloFormaPagamento } from "@/lib/forma-pagamento";
 import { formatarNumeroPedido } from "@/lib/numero-pedido";
 import { formatarData, formatarDataCurta } from "@/lib/datas";
+import {
+  faltasDosPendentes,
+  reservadoPorProduto,
+  somarPorProduto,
+  type Disponibilidade,
+  type PedidoPendente,
+  type ProdutoEstoque,
+} from "@/lib/estoque";
 
 type Cliente = {
   id: string;
@@ -50,12 +58,49 @@ type PedidoLista = {
   }[];
 };
 
+type Relacao<T> = T | T[] | null;
+
+type PendenteBanco = {
+  id: string;
+  created_at: string;
+  data_entrega_prevista: string | null;
+  pedido_itens: {
+    produto_id: string;
+    quantidade: number;
+    produtos: Relacao<ProdutoEstoque>;
+  }[];
+};
+
+function primeiro<T>(relacao: Relacao<T>) {
+  return Array.isArray(relacao) ? (relacao[0] ?? null) : relacao;
+}
+
+// Todos os pendentes (nao so os 10 da lista), para saber o que esta reservado e o que falta.
+function montarPendentes(linhas: PendenteBanco[]) {
+  const pendentes: PedidoPendente[] = [];
+  const produtosEstoque = new Map<string, ProdutoEstoque>();
+  for (const linha of linhas) {
+    pendentes.push({
+      id: linha.id,
+      created_at: linha.created_at,
+      data_entrega_prevista: linha.data_entrega_prevista,
+      itens: linha.pedido_itens.map((item) => ({ produto_id: item.produto_id, quantidade: item.quantidade })),
+    });
+    for (const item of linha.pedido_itens) {
+      const produto = primeiro(item.produtos);
+      if (produto) produtosEstoque.set(item.produto_id, produto);
+    }
+  }
+  return { pendentes, produtosEstoque };
+}
+
 async function carregarDadosPedidos(tenantId: string, statusFiltro: "todos" | "pendente" | "entregue") {
   if (!hasSupabaseEnv()) {
     return {
       clientes: [] as Cliente[],
       produtos: [] as Produto[],
       pedidos: [] as PedidoLista[],
+      pendentes: [] as PendenteBanco[],
       erro: "",
     };
   }
@@ -75,7 +120,7 @@ async function carregarDadosPedidos(tenantId: string, statusFiltro: "todos" | "p
     pedidosQuery = pedidosQuery.eq("status", statusFiltro);
   }
 
-  const [clientesResp, produtosResp, pedidosResp] = await Promise.all([
+  const [clientesResp, produtosResp, pedidosResp, pendentesResp] = await Promise.all([
     supabase.from("clientes").select("id, nome").eq("tenant_id", tenantId).order("nome", { ascending: true }),
     supabase
       .from("produtos")
@@ -84,14 +129,22 @@ async function carregarDadosPedidos(tenantId: string, statusFiltro: "todos" | "p
       .eq("ativo", true)
       .order("nome", { ascending: true }),
     pedidosQuery,
+    supabase
+      .from("pedidos")
+      .select(
+        "id, created_at, data_entrega_prevista, pedido_itens(produto_id, quantidade, produtos(nome, estoque_atual, preco_variavel))",
+      )
+      .eq("tenant_id", tenantId)
+      .eq("status", "pendente"),
   ]);
 
-  const erro = mensagemErro(clientesResp.error, produtosResp.error, pedidosResp.error);
+  const erro = mensagemErro(clientesResp.error, produtosResp.error, pedidosResp.error, pendentesResp.error);
 
   return {
     clientes: (clientesResp.data ?? []) as Cliente[],
     produtos: (produtosResp.data ?? []) as Produto[],
     pedidos: (pedidosResp.data ?? []) as PedidoLista[],
+    pendentes: (pendentesResp.data ?? []) as PendenteBanco[],
     erro,
   };
 }
@@ -123,9 +176,32 @@ export default async function PedidosPage({ searchParams }: PageProps) {
   const novo = typeof params.novo === "string" ? params.novo : "";
   const statusFiltro =
     params.status === "pendente" || params.status === "entregue" ? params.status : "todos";
-  const { clientes, produtos, pedidos, erro } = await carregarDadosPedidos(sessao.tenantId, statusFiltro);
+  const { clientes, produtos, pedidos, pendentes: pendentesBanco, erro } = await carregarDadosPedidos(
+    sessao.tenantId,
+    statusFiltro,
+  );
   const pedidoEdicao = pedidos.find((pedido) => pedido.id === editarId);
   const mostrarFormulario = Boolean(pedidoEdicao) || novo === "1";
+
+  const { pendentes, produtosEstoque } = montarPendentes(pendentesBanco);
+  const { porPedido: faltasPorPedido, aProduzir } = faltasDosPendentes(pendentes, produtosEstoque);
+
+  // No formulario, o disponivel desconta os outros pendentes. Se o pedido editado ja foi
+  // entregue, o que ele baixou volta para a conta.
+  const reservado = reservadoPorProduto(pendentes, pedidoEdicao?.id);
+  const jaBaixado =
+    pedidoEdicao?.status === "entregue" ? somarPorProduto(pedidoEdicao.pedido_itens) : new Map<string, number>();
+  const disponibilidade: Record<string, Disponibilidade> = Object.fromEntries(
+    produtos
+      .filter((produto) => !produto.preco_variavel)
+      .map((produto) => [
+        produto.id,
+        {
+          estoque: produto.estoque_atual + (jaBaixado.get(produto.id) ?? 0),
+          reservado: reservado.get(produto.id) ?? 0,
+        },
+      ]),
+  );
 
   return (
     <section className="space-y-6">
@@ -163,6 +239,7 @@ export default async function PedidosPage({ searchParams }: PageProps) {
           key={pedidoEdicao?.id ?? "novo"}
           clientes={clientes}
           produtos={produtos}
+          disponibilidade={disponibilidade}
           pedidoEdicao={
             pedidoEdicao
               ? {
@@ -179,6 +256,20 @@ export default async function PedidosPage({ searchParams }: PageProps) {
           }
           mostrarCancelarNovo={!pedidoEdicao}
         />
+      ) : null}
+
+      {aProduzir.length > 0 ? (
+        <article className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
+          <h2 className="font-medium">Falta estoque para os pedidos pendentes</h2>
+          <p className="mt-1 text-xs">Para entregar todos, ainda falta produzir:</p>
+          <ul className="mt-2 space-y-1">
+            {aProduzir.map((item) => (
+              <li key={item.produto_id}>
+                {item.nome}: <span className="font-semibold">{item.falta} un.</span>
+              </li>
+            ))}
+          </ul>
+        </article>
       ) : null}
 
       <article className="rounded-xl border border-black/10 bg-surface p-4">
@@ -262,6 +353,15 @@ export default async function PedidosPage({ searchParams }: PageProps) {
                     </li>
                   ))}
                 </ul>
+                {pedido.status === "pendente" && faltasPorPedido.has(pedido.id) ? (
+                  <p className="mt-2 rounded-md bg-amber-50 px-2 py-1 text-xs text-amber-900">
+                    Sem estoque para entregar:{" "}
+                    {faltasPorPedido
+                      .get(pedido.id)
+                      ?.map((falta) => `${falta.nome} (faltam ${falta.falta})`)
+                      .join(", ")}
+                  </p>
+                ) : null}
 
                 <div className="mt-3 flex items-center justify-between">
                   <div className="flex gap-2">
