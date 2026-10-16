@@ -1,5 +1,6 @@
 import { getSupabaseClient, hasSupabaseEnv, mensagemErro } from "@/lib/supabase";
 import { requireSession } from "@/lib/auth";
+import { formatarData } from "@/lib/datas";
 
 export const dynamic = "force-dynamic";
 
@@ -41,13 +42,6 @@ function formatarMoeda(valor: number) {
   }).format(valor);
 }
 
-function formatarData(dataIso: string) {
-  return new Intl.DateTimeFormat("pt-BR", {
-    dateStyle: "short",
-    timeStyle: "short",
-    timeZone: "America/Sao_Paulo",
-  }).format(new Date(dataIso));
-}
 
 function extrairNomeCliente(relacao: { nome: string } | { nome: string }[] | null | undefined) {
   if (!relacao) return "Cliente nao encontrado";

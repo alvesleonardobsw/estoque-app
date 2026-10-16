@@ -3,6 +3,7 @@ import { requireSession } from "@/lib/auth";
 import { PrintControls } from "./print-controls";
 import { rotuloFormaPagamento } from "@/lib/forma-pagamento";
 import { formatarNumeroPedido } from "@/lib/numero-pedido";
+import { formatarData, formatarDataCurta } from "@/lib/datas";
 
 type PedidoDetalhe = {
   id: string;
@@ -24,20 +25,6 @@ type PedidoDetalhe = {
 type PageProps = {
   params: Promise<{ id: string }>;
 };
-
-function formatarData(dataIso: string) {
-  return new Intl.DateTimeFormat("pt-BR", {
-    dateStyle: "short",
-    timeStyle: "short",
-    timeZone: "America/Sao_Paulo",
-  }).format(new Date(dataIso));
-}
-
-function formatarDataSomenteData(dataIso: string) {
-  const [ano, mes, dia] = dataIso.split("-");
-  if (!ano || !mes || !dia) return dataIso;
-  return `${dia}/${mes}/${ano}`;
-}
 
 function formatarMoeda(valor: number) {
   return new Intl.NumberFormat("pt-BR", {
@@ -128,7 +115,7 @@ export default async function ImprimirPedidoPage({ params }: PageProps) {
         </p>
         {pedido.data_entrega_prevista ? (
           <p>
-            <strong>Data de Entrega:</strong> {formatarDataSomenteData(pedido.data_entrega_prevista)}
+            <strong>Data de Entrega:</strong> {formatarDataCurta(pedido.data_entrega_prevista)}
           </p>
         ) : null}
         {pedido.data_entrega ? (

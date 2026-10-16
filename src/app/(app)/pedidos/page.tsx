@@ -8,6 +8,7 @@ import { FormaPagamentoButton } from "./forma-pagamento-button";
 import { CheckCircleIcon, EditIcon, PrintIcon, UndoIcon } from "@/components/action-icons";
 import { rotuloFormaPagamento } from "@/lib/forma-pagamento";
 import { formatarNumeroPedido } from "@/lib/numero-pedido";
+import { formatarData, formatarDataCurta } from "@/lib/datas";
 
 type Cliente = {
   id: string;
@@ -100,20 +101,6 @@ function formatarMoeda(valor: number) {
     style: "currency",
     currency: "BRL",
   }).format(valor);
-}
-
-function formatarData(dataIso: string) {
-  return new Intl.DateTimeFormat("pt-BR", {
-    dateStyle: "short",
-    timeStyle: "short",
-    timeZone: "America/Sao_Paulo",
-  }).format(new Date(dataIso));
-}
-
-function formatarDataCurta(dataIso: string) {
-  const [ano, mes, dia] = dataIso.split("-");
-  if (!ano || !mes || !dia) return dataIso;
-  return `${dia}/${mes}/${ano}`;
 }
 
 function extrairNomeRelacao(

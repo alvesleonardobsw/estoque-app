@@ -4,11 +4,19 @@ import { ProdutoForm } from "./produto-form";
 import Link from "next/link";
 import { EditIcon } from "@/components/action-icons";
 import { CardapioEstoque } from "./cardapio-estoque";
+import {
+  PESOS_FILTRO,
+  ehSabor,
+  filtrarProdutos,
+  normalizarPeso,
+  obterSaborEfetivo,
+  type Sabor,
+} from "@/lib/produtos";
 
 type Produto = {
   id: string;
   nome: string;
-  sabor: "frango" | "carne" | "palmito" | "calabresa" | "camarao";
+  sabor: Sabor;
   preco: number;
   preco_variavel: boolean;
   estoque_atual: number;
@@ -52,41 +60,6 @@ type PageProps = {
   }>;
 };
 
-type Sabor = "frango" | "carne" | "palmito" | "calabresa" | "camarao";
-
-function normalizarPeso(valor: string) {
-  return valor.toLowerCase().replace(/\s+/g, "");
-}
-
-function normalizarTexto(valor: string) {
-  return valor
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase();
-}
-
-function inferirSaborDoNome(nomeProduto: string): Sabor | "" {
-  const nome = normalizarTexto(nomeProduto);
-  if (nome.includes("camarao")) return "camarao";
-  if (nome.includes("calabresa")) return "calabresa";
-  if (nome.includes("palmito")) return "palmito";
-  if (nome.includes("carne")) return "carne";
-  if (nome.includes("frango")) return "frango";
-  return "";
-}
-
-function obterSaborEfetivo(produto: Produto): Sabor {
-  const inferido = inferirSaborDoNome(produto.nome);
-  if (produto.sabor !== "frango") return produto.sabor;
-  if (inferido && inferido !== "frango") return inferido;
-  return produto.sabor;
-}
-
-function extrairPesoDoNome(nome: string) {
-  const match = nome.toLowerCase().match(/(\d+\s?(?:g|kg))/);
-  return match ? normalizarPeso(match[1]) : "";
-}
-
 export default async function ProdutosPage({ searchParams }: PageProps) {
   const sessao = await requireSession();
   const params = await searchParams;
@@ -94,27 +67,12 @@ export default async function ProdutosPage({ searchParams }: PageProps) {
   const novo = typeof params.novo === "string" ? params.novo : "";
   const erroAcao = typeof params.erro === "string" ? params.erro : "";
   const sucessoAcao = typeof params.sucesso === "string" ? params.sucesso : "";
-  const saborFiltro =
-    params.sabor === "frango" ||
-    params.sabor === "carne" ||
-    params.sabor === "palmito" ||
-    params.sabor === "calabresa" ||
-    params.sabor === "camarao"
-      ? (params.sabor as Sabor)
-      : "";
+  const saborFiltro = ehSabor(params.sabor) ? params.sabor : "";
   const pesoFiltro = typeof params.peso === "string" ? normalizarPeso(params.peso) : "";
   const { produtos, erro } = await listarProdutos(sessao.tenantId);
   const produtoEdicao = produtos.find((produto) => produto.id === editarId) ?? null;
   const mostrarFormulario = Boolean(produtoEdicao) || novo === "1";
-  const produtosFiltrados = produtos.filter((produto) => {
-    const matchSabor = !saborFiltro || obterSaborEfetivo(produto) === saborFiltro;
-    const matchPeso =
-      !pesoFiltro ||
-      (pesoFiltro === "travessa"
-        ? produto.preco_variavel
-        : extrairPesoDoNome(produto.nome) === pesoFiltro);
-    return matchSabor && matchPeso;
-  });
+  const produtosFiltrados = filtrarProdutos(produtos, { sabor: saborFiltro, peso: pesoFiltro });
 
   return (
     <section className="space-y-6">
@@ -204,12 +162,11 @@ export default async function ProdutosPage({ searchParams }: PageProps) {
               className="rounded-md border border-black/15 bg-white px-2 py-2"
             >
               <option value="">Todos</option>
-              <option value="50g">50g</option>
-              <option value="200g">200g</option>
-              <option value="350g">350g</option>
-              <option value="500g">500g</option>
-              <option value="1kg">1kg</option>
-              <option value="travessa">Travessa</option>
+              {PESOS_FILTRO.map((peso) => (
+                <option key={peso.valor} value={peso.valor}>
+                  {peso.rotulo}
+                </option>
+              ))}
             </select>
           </label>
 
